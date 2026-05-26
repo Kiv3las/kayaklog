@@ -11,13 +11,11 @@ export interface Lap {
   note: string;
 }
 
-export type RiverSection = 'alto' | 'medio' | 'bajo' | 'todo';
-
 export interface River {
   name: string;
   country: string;
   difficulty: 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI';
-  section?: RiverSection;
+  section?: string;
   laps: Lap[];
   startLocation?: LatLng;
   endLocation?: LatLng;

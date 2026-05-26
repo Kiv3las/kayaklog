@@ -79,6 +79,7 @@ const en: Translations = {
     sectionMedio: 'Middle',
     sectionBajo: 'Lower',
     sectionTodo: 'Full',
+    sectionPlaceholder: 'Custom...',
   },
   log: {
     title: 'Log',

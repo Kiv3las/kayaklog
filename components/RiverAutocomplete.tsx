@@ -10,13 +10,14 @@ interface RiverSuggestion {
   name: string;
   country: string;
   difficulty: Difficulty;
+  section?: string;
   count: number;
 }
 
 interface Props {
   value: string;
   onChange: (name: string) => void;
-  onSelect: (name: string, country: string, difficulty: Difficulty) => void;
+  onSelect: (name: string, country: string, difficulty: Difficulty, section?: string) => void;
   days: Day[];
   placeholder?: string;
 }
@@ -29,8 +30,9 @@ function buildDict(days: Day[]): RiverSuggestion[] {
       const existing = map.get(key);
       if (existing) {
         existing.count++;
+        if (river.section) existing.section = river.section;
       } else {
-        map.set(key, { name: river.name, country: river.country, difficulty: river.difficulty, count: 1 });
+        map.set(key, { name: river.name, country: river.country, difficulty: river.difficulty, section: river.section, count: 1 });
       }
     }
   }
@@ -75,6 +77,15 @@ function makeStyles(c: Colors) {
     suggestionInfo: { flex: 1 },
     suggestionName: { fontSize: 14, fontWeight: '600', color: c.textPrimary },
     suggestionDetail: { fontSize: 12, color: c.textTertiary },
+    sectionChip: {
+      backgroundColor: `${c.primary}18`,
+      borderRadius: 4,
+      paddingHorizontal: 5,
+      paddingVertical: 1,
+      alignSelf: 'flex-start',
+      marginTop: 2,
+    },
+    sectionChipText: { fontSize: 11, fontWeight: '600', color: c.primary },
   });
 }
 
@@ -109,12 +120,19 @@ export default function RiverAutocomplete({ value, onChange, onSelect, days, pla
               <TouchableOpacity
                 key={i}
                 style={[styles.suggestion, i < filtered.length - 1 && styles.suggestionBorder]}
-                onPress={() => { onSelect(s.name, s.country, s.difficulty); setFocused(false); }}
+                onPress={() => { onSelect(s.name, s.country, s.difficulty, s.section); setFocused(false); }}
               >
                 <Text style={styles.flag}>{country?.flag ?? '🏳️'}</Text>
                 <View style={styles.suggestionInfo}>
                   <Text style={styles.suggestionName}>{s.name}</Text>
-                  <Text style={styles.suggestionDetail}>{t('autocomplete.trips', { count: s.count })} · {t('autocomplete.detail', { level: s.difficulty })}</Text>
+                  <Text style={styles.suggestionDetail}>
+                    {t('autocomplete.trips', { count: s.count })} · {t('autocomplete.detail', { level: s.difficulty })}
+                  </Text>
+                  {s.section && s.section !== '' && s.section !== 'todo' && (
+                    <View style={styles.sectionChip}>
+                      <Text style={styles.sectionChipText}>{s.section}</Text>
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
             );

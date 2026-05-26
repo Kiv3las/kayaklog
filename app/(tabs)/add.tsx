@@ -10,7 +10,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useApp } from '../../lib/AppContext';
 import { useTheme } from '../../lib/themeContext';
 import type { Colors } from '../../constants/theme';
-import { Day, River, Lap, Difficulty, LatLng, RiverSection } from '../../lib/types';
+import { Day, River, Lap, Difficulty, LatLng } from '../../lib/types';
 import { todayISO, isoFromDate, parseDateISO, formatDisplayDate } from '../../lib/dates';
 import { spacing, radius } from '../../constants/theme';
 import { refreshNotificationSchedule } from '../../lib/notifications';
@@ -18,12 +18,13 @@ import StarRating from '../../components/StarRating';
 import RiverAutocomplete from '../../components/RiverAutocomplete';
 import CountryPicker from '../../components/CountryPicker';
 import MapPicker from '../../components/MapPicker';
-import GearButton from '../../components/GearButton';
 
 const DIFFICULTIES: Difficulty[] = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
 function emptyLap(): Lap { return { km: 0, hours: 0, minutes: 0, stars: 0, note: '' }; }
-function emptyRiver(): River { return { name: '', country: 'CL', difficulty: 'III', section: 'todo', laps: [emptyLap()] }; }
+const SECTION_PRESETS = ['Alto', 'Medio', 'Bajo', 'Todo'];
+
+function emptyRiver(): River { return { name: '', country: 'CL', difficulty: 'III', section: '', laps: [emptyLap()] }; }
 
 function makeStyles(c: Colors) {
   return StyleSheet.create({
@@ -245,13 +246,9 @@ export default function AddScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        {isEdit ? (
-          <TouchableOpacity onPress={() => router.back()} accessibilityLabel={t('add.cancel')}>
-            <Text style={styles.cancelLink}>{t('add.cancel')}</Text>
-          </TouchableOpacity>
-        ) : (
-          <GearButton />
-        )}
+        <TouchableOpacity onPress={() => router.back()} accessibilityLabel={t('add.cancel')}>
+          <Text style={styles.cancelLink}>{t('add.cancel')}</Text>
+        </TouchableOpacity>
         <Text style={styles.title}>{isEdit ? t('add.editDay') : t('add.newDay')}</Text>
         <TouchableOpacity onPress={handleSave} disabled={!canSave} accessibilityLabel={t('add.save')}>
           <Text style={[styles.saveLink, !canSave && styles.saveLinkDisabled]}>
@@ -308,9 +305,9 @@ export default function AddScreen() {
             <RiverAutocomplete
               value={river.name}
               onChange={(name) => updateRiver(ri, { name })}
-              onSelect={(name, country, difficulty) => {
+              onSelect={(name, country, difficulty, section) => {
                 const locs = lastLocationsForRiver(name);
-                updateRiver(ri, { name, country, difficulty, ...locs });
+                updateRiver(ri, { name, country, difficulty, section: section ?? '', ...locs });
               }}
               days={days}
               placeholder={t('add.riverNamePlaceholder')}
@@ -318,18 +315,24 @@ export default function AddScreen() {
 
             <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.section')}</Text>
             <View style={styles.sectionRow}>
-              {(['alto', 'medio', 'bajo', 'todo'] as RiverSection[]).map((s) => (
+              {SECTION_PRESETS.map((s) => (
                 <TouchableOpacity
                   key={s}
-                  style={[styles.sectionBtn, (river.section ?? 'todo') === s && styles.sectionBtnActive]}
-                  onPress={() => updateRiver(ri, { section: s })}
+                  style={[styles.sectionBtn, river.section === s && styles.sectionBtnActive]}
+                  onPress={() => updateRiver(ri, { section: river.section === s ? '' : s })}
                 >
-                  <Text style={[styles.sectionBtnText, (river.section ?? 'todo') === s && styles.sectionBtnTextActive]}>
-                    {t(`add.section${s.charAt(0).toUpperCase() + s.slice(1)}` as any)}
-                  </Text>
+                  <Text style={[styles.sectionBtnText, river.section === s && styles.sectionBtnTextActive]}>{s}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+            <TextInput
+              style={[styles.input, { marginTop: 6 }]}
+              value={river.section ?? ''}
+              onChangeText={(section) => updateRiver(ri, { section })}
+              placeholder={t('add.sectionPlaceholder')}
+              placeholderTextColor={colors.textTertiary}
+              returnKeyType="done"
+            />
 
             <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.country')}</Text>
             <CountryPicker value={river.country} onChange={(country) => updateRiver(ri, { country })} />

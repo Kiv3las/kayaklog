@@ -123,9 +123,9 @@ export default function DayCard({ day, onEdit, onDelete }: Props) {
             <View style={styles.riverHeader}>
               <Text style={styles.flag}>{country?.flag ?? '🏳️'}</Text>
               <Text style={styles.riverName}>{river.name}</Text>
-              {river.section && river.section !== 'todo' && (
+              {river.section && river.section !== '' && river.section !== 'todo' && (
                 <View style={styles.sectionBadge}>
-                  <Text style={styles.sectionText}>{t(`add.section${river.section.charAt(0).toUpperCase() + river.section.slice(1)}` as any)}</Text>
+                  <Text style={styles.sectionText}>{river.section}</Text>
                 </View>
               )}
               <View style={styles.diffBadge}>

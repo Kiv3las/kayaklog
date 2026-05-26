@@ -194,11 +194,6 @@ function RiverRow({ river, styles, colors }: { river: RiverStat; styles: ReturnT
     <View style={styles.riverCard}>
       <View style={styles.riverTop}>
         <Text style={styles.riverName}>{river.name}</Text>
-        {river.section && river.section !== 'todo' && (
-          <View style={[styles.diffBadge, { borderColor: `${colors.primary}40`, backgroundColor: `${colors.primary}18` }]}>
-            <Text style={[styles.diffText, { color: colors.primary }]}>{t(`add.section${river.section.charAt(0).toUpperCase() + river.section.slice(1)}` as any)}</Text>
-          </View>
-        )}
         <View style={styles.diffBadge}>
           <Text style={styles.diffText}>{t('rivers.class', { level: river.difficulty })}</Text>
         </View>

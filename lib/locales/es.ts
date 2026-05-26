@@ -77,6 +77,7 @@ const es = {
     sectionMedio: 'Medio',
     sectionBajo: 'Bajo',
     sectionTodo: 'Todo',
+    sectionPlaceholder: 'Personalizado...',
   },
   log: {
     title: 'Registro',
