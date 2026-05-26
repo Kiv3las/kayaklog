@@ -118,16 +118,23 @@ export default function DayCard({ day, onEdit, onDelete }: Props) {
 
       {day.rivers.map((river, ri) => {
         const country = countryByCode[river.country];
+        const uniqueSections = [...new Set(river.laps.map(l => l.section).filter((s): s is string => !!s && s !== '' && s !== 'todo'))];
+        const multiSection = uniqueSections.length > 1;
         return (
           <View key={ri} style={styles.riverBlock}>
             <View style={styles.riverHeader}>
               <Text style={styles.flag}>{country?.flag ?? '🏳️'}</Text>
               <Text style={styles.riverName}>{river.name}</Text>
+              {uniqueSections.map((s) => (
+                <View key={s} style={styles.sectionBadge}>
+                  <Text style={styles.sectionText}>{s}</Text>
+                </View>
+              ))}
             </View>
             {river.laps.map((lap, li) => (
               <View key={li} style={styles.lapBlock}>
                 <View style={styles.lapMeta}>
-                  {lap.section && lap.section !== '' && lap.section !== 'todo' && (
+                  {multiSection && lap.section && lap.section !== '' && lap.section !== 'todo' && (
                     <View style={styles.sectionBadge}>
                       <Text style={styles.sectionText}>{lap.section}</Text>
                     </View>

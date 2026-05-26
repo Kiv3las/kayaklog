@@ -198,6 +198,15 @@ function RiverRow({ river, styles, colors }: { river: RiverStat; styles: ReturnT
           <Text style={styles.diffText}>{t('rivers.class', { level: river.difficulty })}</Text>
         </View>
       </View>
+      {river.sections.length > 0 && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+          {river.sections.map((s) => (
+            <View key={s} style={[styles.diffBadge, { borderColor: `${colors.primary}40`, backgroundColor: `${colors.primary}18` }]}>
+              <Text style={[styles.diffText, { color: colors.primary }]}>{s}</Text>
+            </View>
+          ))}
+        </View>
+      )}
       {river.avgRating > 0 && <View style={{ marginBottom: 6 }}><StarsDisplay value={Math.round(river.avgRating)} /></View>}
       <View style={styles.riverStats}>
         <StatPill icon="speedometer-outline" label={`${river.km} km`} styles={styles} colors={colors} />

@@ -128,6 +128,7 @@ export interface RiverStat {
   name: string;
   country: string;
   difficulty: string;
+  sections: string[];
   km: number;
   laps: number;
   timeMinutes: number;
@@ -148,6 +149,7 @@ export function aggregateRivers(days: Day[]): RiverStat[] {
         laps++;
         if (lap.stars > 0) { stars += lap.stars; ratedLaps++; }
       }
+      const newSections = river.laps.map(l => l.section).filter((s): s is string => !!s && s !== '' && s !== 'todo');
       if (existing) {
         existing.km += km;
         existing.timeMinutes += timeMin;
@@ -155,11 +157,15 @@ export function aggregateRivers(days: Day[]): RiverStat[] {
         existing.avgRating = ratedLaps > 0
           ? (existing.avgRating * existing.laps + stars) / (existing.laps + ratedLaps)
           : existing.avgRating;
+        for (const s of newSections) {
+          if (!existing.sections.includes(s)) existing.sections.push(s);
+        }
       } else {
         map.set(key, {
           name: river.name,
           country: river.country,
           difficulty: river.laps[0]?.difficulty ?? 'III',
+          sections: [...new Set(newSections)],
           km: Math.round(km * 10) / 10,
           laps,
           timeMinutes: timeMin,
