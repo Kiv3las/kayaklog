@@ -22,6 +22,26 @@ import MapPicker from '../../components/MapPicker';
 const DIFFICULTIES: Difficulty[] = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 const SECTION_PRESETS = ['Alto', 'Medio', 'Bajo', 'Todo'];
 
+function isPresetActive(section: string | undefined, preset: string): boolean {
+  if (!section) return false;
+  return section === preset || section.split('-').includes(preset);
+}
+
+function togglePreset(current: string, preset: string): string {
+  if (preset === 'Todo') {
+    return isPresetActive(current, 'Todo') ? '' : 'Todo';
+  }
+  const parts = current.split('-').filter((p) => SECTION_PRESETS.includes(p) && p !== 'Todo');
+  const idx = parts.indexOf(preset);
+  if (idx >= 0) {
+    parts.splice(idx, 1);
+  } else {
+    parts.push(preset);
+    parts.sort((a, b) => SECTION_PRESETS.indexOf(a) - SECTION_PRESETS.indexOf(b));
+  }
+  return parts.join('-');
+}
+
 function emptyLap(): Lap {
   return { km: 0, hours: 0, minutes: 0, stars: 0, note: '', difficulty: 'III', section: '' };
 }
@@ -350,10 +370,10 @@ export default function AddScreen() {
                   {SECTION_PRESETS.map((s) => (
                     <TouchableOpacity
                       key={s}
-                      style={[styles.sectionBtn, lap.section === s && styles.sectionBtnActive]}
-                      onPress={() => updateLap(ri, li, { section: lap.section === s ? '' : s })}
+                      style={[styles.sectionBtn, isPresetActive(lap.section, s) && styles.sectionBtnActive]}
+                      onPress={() => updateLap(ri, li, { section: togglePreset(lap.section ?? '', s) })}
                     >
-                      <Text style={[styles.sectionBtnText, lap.section === s && styles.sectionBtnTextActive]}>{s}</Text>
+                      <Text style={[styles.sectionBtnText, isPresetActive(lap.section, s) && styles.sectionBtnTextActive]}>{s}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
