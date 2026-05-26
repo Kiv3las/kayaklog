@@ -159,7 +159,7 @@ export default function InicioScreen() {
               const c = countryByCode[r.country];
               return (
                 <Text key={i} style={styles.lastRiver}>
-                  {c?.flag} {r.name} · {t('rivers.class', { level: r.difficulty })}
+                  {c?.flag} {r.name} · {t('rivers.class', { level: r.laps[0]?.difficulty ?? 'III' })}
                 </Text>
               );
             })}

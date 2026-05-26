@@ -159,7 +159,7 @@ export function aggregateRivers(days: Day[]): RiverStat[] {
         map.set(key, {
           name: river.name,
           country: river.country,
-          difficulty: river.difficulty,
+          difficulty: river.laps[0]?.difficulty ?? 'III',
           km: Math.round(km * 10) / 10,
           laps,
           timeMinutes: timeMin,

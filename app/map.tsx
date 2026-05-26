@@ -150,16 +150,18 @@ export default function MapScreen() {
     const result: RouteItem[] = [];
     for (const day of filteredDays) {
       for (const river of day.rivers) {
-        if (!river.startLocation) continue;
-        const poly = river.endLocation
-          ? [{ latitude: river.startLocation.lat, longitude: river.startLocation.lng }, { latitude: river.endLocation.lat, longitude: river.endLocation.lng }]
-          : [];
-        result.push({
-          id: `${day.id}-${river.name}`,
-          name: river.name, difficulty: river.difficulty, date: day.date,
-          start: { latitude: river.startLocation.lat, longitude: river.startLocation.lng },
-          end: river.endLocation ? { latitude: river.endLocation.lat, longitude: river.endLocation.lng } : undefined,
-          polyline: poly,
+        river.laps.forEach((lap, li) => {
+          if (!lap.startLocation) return;
+          const poly = lap.endLocation
+            ? [{ latitude: lap.startLocation.lat, longitude: lap.startLocation.lng }, { latitude: lap.endLocation.lat, longitude: lap.endLocation.lng }]
+            : [];
+          result.push({
+            id: `${day.id}-${river.name}-${li}`,
+            name: river.name, difficulty: lap.difficulty ?? 'III', date: day.date,
+            start: { latitude: lap.startLocation.lat, longitude: lap.startLocation.lng },
+            end: lap.endLocation ? { latitude: lap.endLocation.lat, longitude: lap.endLocation.lng } : undefined,
+            polyline: poly,
+          });
         });
       }
     }

@@ -27,12 +27,20 @@ function buildDict(days: Day[]): RiverSuggestion[] {
   for (const day of days) {
     for (const river of day.rivers) {
       const key = river.name.toLowerCase();
+      const firstLap = river.laps[0];
       const existing = map.get(key);
       if (existing) {
         existing.count++;
-        if (river.section) existing.section = river.section;
+        if (firstLap?.section) existing.section = firstLap.section;
+        if (firstLap?.difficulty) existing.difficulty = firstLap.difficulty;
       } else {
-        map.set(key, { name: river.name, country: river.country, difficulty: river.difficulty, section: river.section, count: 1 });
+        map.set(key, {
+          name: river.name,
+          country: river.country,
+          difficulty: firstLap?.difficulty ?? 'III',
+          section: firstLap?.section,
+          count: 1,
+        });
       }
     }
   }

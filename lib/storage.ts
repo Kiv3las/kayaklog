@@ -15,8 +15,7 @@ function seedDays(): Day[] {
       rivers: [{
         name: 'Río Maipo',
         country: 'CL',
-        difficulty: 'III',
-        laps: [{ km: 8, hours: 1, minutes: 30, stars: 4, note: 'Perfectas condiciones' }],
+        laps: [{ km: 8, hours: 1, minutes: 30, stars: 4, note: 'Perfectas condiciones', difficulty: 'III' }],
       }],
     },
     {
@@ -26,8 +25,7 @@ function seedDays(): Day[] {
       rivers: [{
         name: 'Río Claro',
         country: 'CL',
-        difficulty: 'II',
-        laps: [{ km: 5, hours: 0, minutes: 55, stars: 3, note: '' }],
+        laps: [{ km: 5, hours: 0, minutes: 55, stars: 3, note: '', difficulty: 'II' }],
       }],
     },
     {
@@ -37,10 +35,9 @@ function seedDays(): Day[] {
       rivers: [{
         name: 'Río Biobío',
         country: 'CL',
-        difficulty: 'IV',
         laps: [
-          { km: 12, hours: 2, minutes: 15, stars: 5, note: 'Increíble!' },
-          { km: 6, hours: 1, minutes: 0, stars: 4, note: 'Segunda vuelta' },
+          { km: 12, hours: 2, minutes: 15, stars: 5, note: 'Increíble!', difficulty: 'IV' },
+          { km: 6, hours: 1, minutes: 0, stars: 4, note: 'Segunda vuelta', difficulty: 'IV' },
         ],
       }],
     },
@@ -51,8 +48,7 @@ function seedDays(): Day[] {
       rivers: [{
         name: 'Río Fuy',
         country: 'CL',
-        difficulty: 'IV',
-        laps: [{ km: 10, hours: 1, minutes: 45, stars: 5, note: 'Clase IV puro' }],
+        laps: [{ km: 10, hours: 1, minutes: 45, stars: 5, note: 'Clase IV puro', difficulty: 'IV' }],
       }],
     },
     {
@@ -62,8 +58,7 @@ function seedDays(): Day[] {
       rivers: [{
         name: 'Río Ñirihuau',
         country: 'AR',
-        difficulty: 'III',
-        laps: [{ km: 15, hours: 2, minutes: 30, stars: 4, note: 'Patagonia hermosa' }],
+        laps: [{ km: 15, hours: 2, minutes: 30, stars: 4, note: 'Patagonia hermosa', difficulty: 'III' }],
       }],
     },
     {
@@ -73,8 +68,7 @@ function seedDays(): Day[] {
       rivers: [{
         name: 'Río Trancura',
         country: 'CL',
-        difficulty: 'III',
-        laps: [{ km: 7, hours: 1, minutes: 20, stars: 4, note: '' }],
+        laps: [{ km: 7, hours: 1, minutes: 20, stars: 4, note: '', difficulty: 'III' }],
       }],
     },
     {
@@ -84,8 +78,7 @@ function seedDays(): Day[] {
       rivers: [{
         name: 'Río Maule',
         country: 'CL',
-        difficulty: 'II',
-        laps: [{ km: 20, hours: 3, minutes: 0, stars: 3, note: 'Aguas bajas' }],
+        laps: [{ km: 20, hours: 3, minutes: 0, stars: 3, note: 'Aguas bajas', difficulty: 'II' }],
       }],
     },
   ];

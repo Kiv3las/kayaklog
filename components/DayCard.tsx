@@ -78,18 +78,18 @@ function makeStyles(c: Colors) {
       borderColor: `${c.primary}40`,
     },
     sectionText: { fontSize: 11, fontWeight: '600', color: c.primary },
+    lapBlock: { paddingLeft: 22, marginBottom: 6 },
+    lapMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3, flexWrap: 'wrap' },
     lapRow: {
       flexDirection: 'row',
       alignItems: 'center',
       flexWrap: 'wrap',
       gap: 6,
-      marginBottom: 4,
-      paddingLeft: 22,
     },
     lapStats: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     lapStat: { fontSize: 13, color: c.textSecondary },
     lapDot: { color: c.textTertiary },
-    lapNote: { fontSize: 12, color: c.textTertiary, fontStyle: 'italic', flex: 1 },
+    lapNote: { fontSize: 12, color: c.textTertiary, fontStyle: 'italic', flex: 1, marginTop: 2 },
   });
 }
 
@@ -123,23 +123,27 @@ export default function DayCard({ day, onEdit, onDelete }: Props) {
             <View style={styles.riverHeader}>
               <Text style={styles.flag}>{country?.flag ?? '🏳️'}</Text>
               <Text style={styles.riverName}>{river.name}</Text>
-              {river.section && river.section !== '' && river.section !== 'todo' && (
-                <View style={styles.sectionBadge}>
-                  <Text style={styles.sectionText}>{river.section}</Text>
-                </View>
-              )}
-              <View style={styles.diffBadge}>
-                <Text style={styles.diffText}>{t('dayCard.class', { level: river.difficulty })}</Text>
-              </View>
             </View>
             {river.laps.map((lap, li) => (
-              <View key={li} style={styles.lapRow}>
-                <View style={styles.lapStats}>
-                  <Text style={styles.lapStat}>{lap.km} km</Text>
-                  <Text style={styles.lapDot}>·</Text>
-                  <Text style={styles.lapStat}>{formatTime(lap.hours, lap.minutes)}</Text>
+              <View key={li} style={styles.lapBlock}>
+                <View style={styles.lapMeta}>
+                  {lap.section && lap.section !== '' && lap.section !== 'todo' && (
+                    <View style={styles.sectionBadge}>
+                      <Text style={styles.sectionText}>{lap.section}</Text>
+                    </View>
+                  )}
+                  <View style={styles.diffBadge}>
+                    <Text style={styles.diffText}>{t('dayCard.class', { level: lap.difficulty ?? 'III' })}</Text>
+                  </View>
                 </View>
-                {lap.stars > 0 && <StarsDisplay value={lap.stars} size={11} />}
+                <View style={styles.lapRow}>
+                  <View style={styles.lapStats}>
+                    <Text style={styles.lapStat}>{lap.km} km</Text>
+                    <Text style={styles.lapDot}>·</Text>
+                    <Text style={styles.lapStat}>{formatTime(lap.hours, lap.minutes)}</Text>
+                  </View>
+                  {lap.stars > 0 && <StarsDisplay value={lap.stars} size={11} />}
+                </View>
                 {lap.note ? <Text style={styles.lapNote} numberOfLines={1}>{lap.note}</Text> : null}
               </View>
             ))}

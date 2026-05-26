@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, TextInput, Platform, Alert,
+  SafeAreaView, TextInput, Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,7 +11,7 @@ import { useApp } from '../../lib/AppContext';
 import { useTheme } from '../../lib/themeContext';
 import type { Colors } from '../../constants/theme';
 import { Day, River, Lap, Difficulty, LatLng } from '../../lib/types';
-import { todayISO, isoFromDate, parseDateISO, formatDisplayDate } from '../../lib/dates';
+import { isoFromDate, parseDateISO, formatDisplayDate } from '../../lib/dates';
 import { spacing, radius } from '../../constants/theme';
 import { refreshNotificationSchedule } from '../../lib/notifications';
 import StarRating from '../../components/StarRating';
@@ -20,11 +20,14 @@ import CountryPicker from '../../components/CountryPicker';
 import MapPicker from '../../components/MapPicker';
 
 const DIFFICULTIES: Difficulty[] = ['I', 'II', 'III', 'IV', 'V', 'VI'];
-
-function emptyLap(): Lap { return { km: 0, hours: 0, minutes: 0, stars: 0, note: '' }; }
 const SECTION_PRESETS = ['Alto', 'Medio', 'Bajo', 'Todo'];
 
-function emptyRiver(): River { return { name: '', country: 'CL', difficulty: 'III', section: '', laps: [emptyLap()] }; }
+function emptyLap(): Lap {
+  return { km: 0, hours: 0, minutes: 0, stars: 0, note: '', difficulty: 'III', section: '' };
+}
+function emptyRiver(): River {
+  return { name: '', country: 'CL', laps: [emptyLap()] };
+}
 
 function makeStyles(c: Colors) {
   return StyleSheet.create({
@@ -194,7 +197,7 @@ export default function AddScreen() {
 
   const [date, setDate] = useState<Date>(existingDay ? parseDateISO(existingDay.date) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [mapPickerRi, setMapPickerRi] = useState<number | null>(null);
+  const [mapPicker, setMapPicker] = useState<{ ri: number; li: number } | null>(null);
   const [notes, setNotes] = useState(existingDay?.notes ?? '');
   const [rivers, setRivers] = useState<River[]>(existingDay?.rivers ?? [emptyRiver()]);
 
@@ -203,7 +206,10 @@ export default function AddScreen() {
   function lastLocationsForRiver(name: string): { startLocation?: LatLng; endLocation?: LatLng } {
     for (const day of days) {
       const river = day.rivers.find((r) => r.name.toLowerCase() === name.toLowerCase());
-      if (river?.startLocation) return { startLocation: river.startLocation, endLocation: river.endLocation };
+      if (river) {
+        const lap = river.laps.find((l) => l.startLocation);
+        if (lap?.startLocation) return { startLocation: lap.startLocation, endLocation: lap.endLocation };
+      }
     }
     return {};
   }
@@ -220,7 +226,13 @@ export default function AddScreen() {
 
   function addRiver() { setRivers((prev) => [...prev, emptyRiver()]); }
   function removeRiver(ri: number) { setRivers((prev) => prev.filter((_, i) => i !== ri)); }
-  function addLap(ri: number) { setRivers((prev) => prev.map((r, i) => i === ri ? { ...r, laps: [...r.laps, emptyLap()] } : r)); }
+  function addLap(ri: number) {
+    setRivers((prev) => prev.map((r, i) => {
+      if (i !== ri) return r;
+      const last = r.laps[r.laps.length - 1];
+      return { ...r, laps: [...r.laps, { ...emptyLap(), difficulty: last?.difficulty ?? 'III', section: last?.section ?? '' }] };
+    }));
+  }
   function removeLap(ri: number, li: number) { setRivers((prev) => prev.map((r, i) => i === ri ? { ...r, laps: r.laps.filter((_, j) => j !== li) } : r)); }
   function duplicateLap(ri: number, li: number) {
     setRivers((prev) => prev.map((r, i) => {
@@ -307,65 +319,15 @@ export default function AddScreen() {
               onChange={(name) => updateRiver(ri, { name })}
               onSelect={(name, country, difficulty, section) => {
                 const locs = lastLocationsForRiver(name);
-                updateRiver(ri, { name, country, difficulty, section: section ?? '', ...locs });
+                updateRiver(ri, { name, country });
+                updateLap(ri, 0, { difficulty: difficulty ?? 'III', section: section ?? '', ...locs });
               }}
               days={days}
               placeholder={t('add.riverNamePlaceholder')}
             />
 
-            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.section')}</Text>
-            <View style={styles.sectionRow}>
-              {SECTION_PRESETS.map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.sectionBtn, river.section === s && styles.sectionBtnActive]}
-                  onPress={() => updateRiver(ri, { section: river.section === s ? '' : s })}
-                >
-                  <Text style={[styles.sectionBtnText, river.section === s && styles.sectionBtnTextActive]}>{s}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TextInput
-              style={[styles.input, { marginTop: 6 }]}
-              value={river.section ?? ''}
-              onChangeText={(section) => updateRiver(ri, { section })}
-              placeholder={t('add.sectionPlaceholder')}
-              placeholderTextColor={colors.textTertiary}
-              returnKeyType="done"
-            />
-
             <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.country')}</Text>
             <CountryPicker value={river.country} onChange={(country) => updateRiver(ri, { country })} />
-
-            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.class')}</Text>
-            <View style={styles.diffRow}>
-              {DIFFICULTIES.map((d) => (
-                <TouchableOpacity
-                  key={d}
-                  style={[styles.diffBtn, river.difficulty === d && styles.diffBtnActive]}
-                  onPress={() => updateRiver(ri, { difficulty: d })}
-                  accessibilityLabel={t('rivers.class', { level: d })}
-                >
-                  <Text style={[styles.diffBtnText, river.difficulty === d && styles.diffBtnTextActive]}>{d}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.location')}</Text>
-            <View style={styles.locationRow}>
-              <TouchableOpacity style={[styles.locationBtn, river.startLocation && styles.locationBtnSet]} onPress={() => setMapPickerRi(ri)}>
-                <View style={[styles.locationDot, { backgroundColor: '#34c759' }]} />
-                <Text style={[styles.locationBtnText, river.startLocation && styles.locationBtnTextSet]}>
-                  {river.startLocation ? t('add.startSet') : t('add.start')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.locationBtn, river.endLocation && styles.locationBtnSet]} onPress={() => setMapPickerRi(ri)}>
-                <View style={[styles.locationDot, { backgroundColor: '#ff3b30' }]} />
-                <Text style={[styles.locationBtnText, river.endLocation && styles.locationBtnTextSet]}>
-                  {river.endLocation ? t('add.endSet') : t('add.end')}
-                </Text>
-              </TouchableOpacity>
-            </View>
 
             {river.laps.map((lap, li) => (
               <View key={li} style={styles.lapCard}>
@@ -383,7 +345,58 @@ export default function AddScreen() {
                   </View>
                 </View>
 
-                <View style={styles.lapRow}>
+                <Text style={styles.fieldLabel}>{t('add.section')}</Text>
+                <View style={styles.sectionRow}>
+                  {SECTION_PRESETS.map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.sectionBtn, lap.section === s && styles.sectionBtnActive]}
+                      onPress={() => updateLap(ri, li, { section: lap.section === s ? '' : s })}
+                    >
+                      <Text style={[styles.sectionBtnText, lap.section === s && styles.sectionBtnTextActive]}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TextInput
+                  style={[styles.input, { marginTop: 6 }]}
+                  value={lap.section ?? ''}
+                  onChangeText={(section) => updateLap(ri, li, { section })}
+                  placeholder={t('add.sectionPlaceholder')}
+                  placeholderTextColor={colors.textTertiary}
+                  returnKeyType="done"
+                />
+
+                <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.class')}</Text>
+                <View style={styles.diffRow}>
+                  {DIFFICULTIES.map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[styles.diffBtn, (lap.difficulty ?? 'III') === d && styles.diffBtnActive]}
+                      onPress={() => updateLap(ri, li, { difficulty: d })}
+                      accessibilityLabel={t('rivers.class', { level: d })}
+                    >
+                      <Text style={[styles.diffBtnText, (lap.difficulty ?? 'III') === d && styles.diffBtnTextActive]}>{d}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.location')}</Text>
+                <View style={styles.locationRow}>
+                  <TouchableOpacity style={[styles.locationBtn, lap.startLocation && styles.locationBtnSet]} onPress={() => setMapPicker({ ri, li })}>
+                    <View style={[styles.locationDot, { backgroundColor: '#34c759' }]} />
+                    <Text style={[styles.locationBtnText, lap.startLocation && styles.locationBtnTextSet]}>
+                      {lap.startLocation ? t('add.startSet') : t('add.start')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.locationBtn, lap.endLocation && styles.locationBtnSet]} onPress={() => setMapPicker({ ri, li })}>
+                    <View style={[styles.locationDot, { backgroundColor: '#ff3b30' }]} />
+                    <Text style={[styles.locationBtnText, lap.endLocation && styles.locationBtnTextSet]}>
+                      {lap.endLocation ? t('add.endSet') : t('add.end')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={[styles.lapRow, { marginTop: 10 }]}>
                   {[
                     { key: 'km', label: t('add.km'), value: lap.km, field: 'km', pad: 'decimal-pad' },
                     { key: 'h', label: t('add.hours'), value: lap.hours, field: 'hours', pad: 'number-pad' },
@@ -434,14 +447,17 @@ export default function AddScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {mapPickerRi !== null && (
+      {mapPicker !== null && (
         <MapPicker
           visible
-          riverName={rivers[mapPickerRi]?.name || undefined}
-          initialStart={rivers[mapPickerRi]?.startLocation}
-          initialEnd={rivers[mapPickerRi]?.endLocation}
-          onConfirm={(start, end) => { updateRiver(mapPickerRi, { startLocation: start, endLocation: end }); setMapPickerRi(null); }}
-          onCancel={() => setMapPickerRi(null)}
+          riverName={rivers[mapPicker.ri]?.name || undefined}
+          initialStart={rivers[mapPicker.ri]?.laps[mapPicker.li]?.startLocation}
+          initialEnd={rivers[mapPicker.ri]?.laps[mapPicker.li]?.endLocation}
+          onConfirm={(start, end) => {
+            updateLap(mapPicker.ri, mapPicker.li, { startLocation: start, endLocation: end });
+            setMapPicker(null);
+          }}
+          onCancel={() => setMapPicker(null)}
         />
       )}
     </SafeAreaView>

@@ -9,16 +9,16 @@ export interface Lap {
   minutes: number;
   stars: number;
   note: string;
+  difficulty?: Difficulty;
+  section?: string;
+  startLocation?: LatLng;
+  endLocation?: LatLng;
 }
 
 export interface River {
   name: string;
   country: string;
-  difficulty: 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI';
-  section?: string;
   laps: Lap[];
-  startLocation?: LatLng;
-  endLocation?: LatLng;
 }
 
 export interface Day {
