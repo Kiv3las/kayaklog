@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Day, Settings } from './types';
 import { todayISO, addDaysToISO } from './dates';
 
-const DAYS_KEY = 'kayak_days_v4';
-const SETTINGS_KEY = 'kayak_settings_v1';
+function daysKey(userId: string) { return `kayak_days_v4_${userId}`; }
+function settingsKey(userId: string) { return `kayak_settings_v1_${userId}`; }
 
 function seedDays(): Day[] {
   const today = todayISO();
@@ -91,12 +91,12 @@ function seedDays(): Day[] {
   ];
 }
 
-export async function loadDays(): Promise<Day[]> {
+export async function loadDays(userId: string): Promise<Day[]> {
   try {
-    const raw = await AsyncStorage.getItem(DAYS_KEY);
+    const raw = await AsyncStorage.getItem(daysKey(userId));
     if (!raw) {
       const seed = seedDays();
-      await AsyncStorage.setItem(DAYS_KEY, JSON.stringify(seed));
+      await AsyncStorage.setItem(daysKey(userId), JSON.stringify(seed));
       return seed;
     }
     return JSON.parse(raw) as Day[];
@@ -105,13 +105,13 @@ export async function loadDays(): Promise<Day[]> {
   }
 }
 
-export async function saveDays(days: Day[]): Promise<void> {
-  await AsyncStorage.setItem(DAYS_KEY, JSON.stringify(days));
+export async function saveDays(days: Day[], userId: string): Promise<void> {
+  await AsyncStorage.setItem(daysKey(userId), JSON.stringify(days));
 }
 
-export async function loadSettings(): Promise<Settings> {
+export async function loadSettings(userId: string): Promise<Settings> {
   try {
-    const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+    const raw = await AsyncStorage.getItem(settingsKey(userId));
     if (!raw) return { notifEnabled: false, notifTime: '21:00' };
     return JSON.parse(raw) as Settings;
   } catch {
@@ -119,6 +119,10 @@ export async function loadSettings(): Promise<Settings> {
   }
 }
 
-export async function saveSettings(settings: Settings): Promise<void> {
-  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+export async function saveSettings(settings: Settings, userId: string): Promise<void> {
+  await AsyncStorage.setItem(settingsKey(userId), JSON.stringify(settings));
+}
+
+export async function clearUserData(userId: string): Promise<void> {
+  await AsyncStorage.multiRemove([daysKey(userId), settingsKey(userId)]);
 }
