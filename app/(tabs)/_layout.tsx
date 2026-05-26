@@ -1,70 +1,68 @@
-import { SymbolView } from 'expo-symbols';
-import { Link, Tabs } from 'expo-router';
-import { Platform, Pressable } from 'react-native';
+import React from 'react';
+import { View, TouchableOpacity, StyleSheet, GestureResponderEvent } from 'react-native';
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { colors } from '../../constants/theme';
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+function tabIcon(name: IoniconsName, focused: boolean, outlineName: IoniconsName) {
+  return <Ionicons name={focused ? name : outlineName} size={24} color={focused ? colors.primary : colors.textTertiary} />;
+}
+
+function AddTabButton({ onPress }: { onPress?: ((e: GestureResponderEvent) => void) | null }) {
+  return (
+    <TouchableOpacity style={styles.addBtn} onPress={onPress ?? undefined} activeOpacity={0.85} accessibilityLabel="Nuevo día">
+      <View style={styles.addBtnCircle}>
+        <Ionicons name="add" size={32} color="#fff" />
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
+        tabBarStyle: { borderTopColor: colors.border, overflow: 'visible' },
+      }}
+    >
+      <Tabs.Screen name="index" options={{ title: 'Inicio', tabBarIcon: ({ focused }) => tabIcon('home', focused, 'home-outline') }} />
+      <Tabs.Screen name="log" options={{ title: 'Registro', tabBarIcon: ({ focused }) => tabIcon('list', focused, 'list-outline') }} />
       <Tabs.Screen
-        name="index"
+        name="add"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
-          ),
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable style={{ marginRight: 15 }}>
-                {({ pressed }) => (
-                  <SymbolView
-                    name={{ ios: 'info.circle', android: 'info', web: 'info' }}
-                    size={25}
-                    tintColor={Colors[colorScheme].text}
-                    style={{ opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
+          title: '',
+          tabBarButton: (props) => <AddTabButton onPress={props.onPress as ((e: GestureResponderEvent) => void) | null} />,
         }}
       />
-      <Tabs.Screen
-        name="two"
-        options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
-          ),
-        }}
-      />
+      <Tabs.Screen name="stats" options={{ title: 'Stats', tabBarIcon: ({ focused }) => tabIcon('bar-chart', focused, 'bar-chart-outline') }} />
+      <Tabs.Screen name="rivers" options={{ title: 'Mis ríos', tabBarIcon: ({ focused }) => tabIcon('water', focused, 'water-outline') }} />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  addBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    top: -16,
+  },
+  addBtnCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+});
