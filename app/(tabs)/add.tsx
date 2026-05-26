@@ -5,13 +5,15 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useApp } from '../../lib/AppContext';
-import { Day, River, Lap, Difficulty } from '../../lib/types';
+import { Day, River, Lap, Difficulty, LatLng } from '../../lib/types';
 import { todayISO, isoFromDate, parseDateISO, formatDisplayDate } from '../../lib/dates';
 import StarRating from '../../components/StarRating';
 import RiverAutocomplete from '../../components/RiverAutocomplete';
 import CountryPicker from '../../components/CountryPicker';
+import MapPicker from '../../components/MapPicker';
 import GearButton from '../../components/GearButton';
 import { colors, spacing, radius } from '../../constants/theme';
 import { refreshNotificationSchedule } from '../../lib/notifications';
@@ -27,6 +29,7 @@ function emptyRiver(): River {
 }
 
 export default function AddScreen() {
+  const { t } = useTranslation();
   const { days, addDay, updateDay, settings } = useApp();
   const router = useRouter();
   const { editId } = useLocalSearchParams<{ editId?: string }>();
@@ -41,12 +44,23 @@ export default function AddScreen() {
     existingDay ? parseDateISO(existingDay.date) : new Date()
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [mapPickerRi, setMapPickerRi] = useState<number | null>(null);
   const [notes, setNotes] = useState(existingDay?.notes ?? '');
   const [rivers, setRivers] = useState<River[]>(
     existingDay?.rivers ?? [emptyRiver()]
   );
 
   const today = new Date();
+
+  function lastLocationsForRiver(name: string): { startLocation?: LatLng; endLocation?: LatLng } {
+    for (const day of days) {
+      const river = day.rivers.find((r) => r.name.toLowerCase() === name.toLowerCase());
+      if (river?.startLocation) {
+        return { startLocation: river.startLocation, endLocation: river.endLocation };
+      }
+    }
+    return {};
+  }
 
   function updateRiver(ri: number, partial: Partial<River>) {
     setRivers((prev) => prev.map((r, i) => (i === ri ? { ...r, ...partial } : r)));
@@ -120,16 +134,16 @@ export default function AddScreen() {
       {/* Header */}
       <View style={styles.header}>
         {isEdit ? (
-          <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Cancelar">
-            <Text style={styles.cancelLink}>Cancelar</Text>
+          <TouchableOpacity onPress={() => router.back()} accessibilityLabel={t('add.cancel')}>
+            <Text style={styles.cancelLink}>{t('add.cancel')}</Text>
           </TouchableOpacity>
         ) : (
           <GearButton />
         )}
-        <Text style={styles.title}>{isEdit ? 'Editar día' : 'Nuevo día'}</Text>
-        <TouchableOpacity onPress={handleSave} disabled={!canSave} accessibilityLabel="Guardar">
+        <Text style={styles.title}>{isEdit ? t('add.editDay') : t('add.newDay')}</Text>
+        <TouchableOpacity onPress={handleSave} disabled={!canSave} accessibilityLabel={t('add.save')}>
           <Text style={[styles.saveLink, !canSave && styles.saveLinkDisabled]}>
-            {isEdit ? 'Guardar cambios' : 'Guardar'}
+            {isEdit ? t('add.saveChanges') : t('add.save')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -137,7 +151,7 @@ export default function AddScreen() {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Date picker */}
         <View style={styles.section}>
-          <Text style={styles.fieldLabel}>Fecha</Text>
+          <Text style={styles.fieldLabel}>{t('add.date')}</Text>
           <View style={styles.dateRow}>
             <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={colors.primary} />
@@ -145,7 +159,7 @@ export default function AddScreen() {
             </TouchableOpacity>
             {!isEdit && (
               <TouchableOpacity style={styles.todayBtn} onPress={() => setDate(new Date())}>
-                <Text style={styles.todayBtnText}>Hoy</Text>
+                <Text style={styles.todayBtnText}>{t('add.today')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -165,12 +179,12 @@ export default function AddScreen() {
 
         {/* Notes */}
         <View style={styles.section}>
-          <Text style={styles.fieldLabel}>Notas del día</Text>
+          <Text style={styles.fieldLabel}>{t('add.dayNotes')}</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             value={notes}
             onChangeText={setNotes}
-            placeholder="¿Cómo estuvo la jornada?"
+            placeholder={t('add.notesPlaceholder')}
             placeholderTextColor={colors.textTertiary}
             multiline
             numberOfLines={3}
@@ -181,37 +195,40 @@ export default function AddScreen() {
         {rivers.map((river, ri) => (
           <View key={ri} style={styles.riverCard}>
             <View style={styles.riverCardHeader}>
-              <Text style={styles.riverCardTitle}>Río {ri + 1}</Text>
+              <Text style={styles.riverCardTitle}>{t('add.river', { n: ri + 1 })}</Text>
               {rivers.length > 1 && (
-                <TouchableOpacity onPress={() => removeRiver(ri)} accessibilityLabel="Eliminar río">
+                <TouchableOpacity onPress={() => removeRiver(ri)} accessibilityLabel={t('add.removeRiver')}>
                   <Ionicons name="close-circle" size={20} color={colors.danger} />
                 </TouchableOpacity>
               )}
             </View>
 
-            <Text style={styles.fieldLabel}>Nombre</Text>
+            <Text style={styles.fieldLabel}>{t('add.riverName')}</Text>
             <RiverAutocomplete
               value={river.name}
               onChange={(name) => updateRiver(ri, { name })}
-              onSelect={(name, country, difficulty) => updateRiver(ri, { name, country, difficulty })}
+              onSelect={(name, country, difficulty) => {
+                const locs = lastLocationsForRiver(name);
+                updateRiver(ri, { name, country, difficulty, ...locs });
+              }}
               days={days}
-              placeholder="Nombre del río"
+              placeholder={t('add.riverNamePlaceholder')}
             />
 
-            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>País</Text>
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.country')}</Text>
             <CountryPicker
               value={river.country}
               onChange={(country) => updateRiver(ri, { country })}
             />
 
-            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Clase</Text>
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.class')}</Text>
             <View style={styles.diffRow}>
               {DIFFICULTIES.map((d) => (
                 <TouchableOpacity
                   key={d}
                   style={[styles.diffBtn, river.difficulty === d && styles.diffBtnActive]}
                   onPress={() => updateRiver(ri, { difficulty: d })}
-                  accessibilityLabel={`Clase ${d}`}
+                  accessibilityLabel={t('rivers.class', { level: d })}
                 >
                   <Text style={[styles.diffBtnText, river.difficulty === d && styles.diffBtnTextActive]}>
                     {d}
@@ -220,17 +237,40 @@ export default function AddScreen() {
               ))}
             </View>
 
+            {/* Location */}
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.location')}</Text>
+            <View style={styles.locationRow}>
+              <TouchableOpacity
+                style={[styles.locationBtn, river.startLocation && styles.locationBtnSet]}
+                onPress={() => setMapPickerRi(ri)}
+              >
+                <View style={[styles.locationDot, { backgroundColor: '#34c759' }]} />
+                <Text style={[styles.locationBtnText, river.startLocation && styles.locationBtnTextSet]}>
+                  {river.startLocation ? t('add.startSet') : t('add.start')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.locationBtn, river.endLocation && styles.locationBtnSet]}
+                onPress={() => setMapPickerRi(ri)}
+              >
+                <View style={[styles.locationDot, { backgroundColor: '#ff3b30' }]} />
+                <Text style={[styles.locationBtnText, river.endLocation && styles.locationBtnTextSet]}>
+                  {river.endLocation ? t('add.endSet') : t('add.end')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Laps */}
             {river.laps.map((lap, li) => (
               <View key={li} style={styles.lapCard}>
                 <View style={styles.lapHeader}>
-                  <Text style={styles.lapTitle}>Lap {li + 1}</Text>
+                  <Text style={styles.lapTitle}>{t('add.lap', { n: li + 1 })}</Text>
                   <View style={styles.lapActions}>
-                    <TouchableOpacity onPress={() => duplicateLap(ri, li)} accessibilityLabel="Duplicar lap">
+                    <TouchableOpacity onPress={() => duplicateLap(ri, li)} accessibilityLabel={t('add.duplicateLap')}>
                       <Ionicons name="copy-outline" size={18} color={colors.primary} />
                     </TouchableOpacity>
                     {river.laps.length > 1 && (
-                      <TouchableOpacity onPress={() => removeLap(ri, li)} accessibilityLabel="Eliminar lap">
+                      <TouchableOpacity onPress={() => removeLap(ri, li)} accessibilityLabel={t('add.removeLap')}>
                         <Ionicons name="trash-outline" size={18} color={colors.danger} />
                       </TouchableOpacity>
                     )}
@@ -239,7 +279,7 @@ export default function AddScreen() {
 
                 <View style={styles.lapRow}>
                   <View style={styles.lapField}>
-                    <Text style={styles.fieldLabel}>Km</Text>
+                    <Text style={styles.fieldLabel}>{t('add.km')}</Text>
                     <TextInput
                       style={styles.input}
                       value={lap.km === 0 ? '' : String(lap.km)}
@@ -250,7 +290,7 @@ export default function AddScreen() {
                     />
                   </View>
                   <View style={styles.lapField}>
-                    <Text style={styles.fieldLabel}>Horas</Text>
+                    <Text style={styles.fieldLabel}>{t('add.hours')}</Text>
                     <TextInput
                       style={styles.input}
                       value={lap.hours === 0 ? '' : String(lap.hours)}
@@ -261,7 +301,7 @@ export default function AddScreen() {
                     />
                   </View>
                   <View style={styles.lapField}>
-                    <Text style={styles.fieldLabel}>Minutos</Text>
+                    <Text style={styles.fieldLabel}>{t('add.minutes')}</Text>
                     <TextInput
                       style={styles.input}
                       value={lap.minutes === 0 ? '' : String(lap.minutes)}
@@ -273,18 +313,18 @@ export default function AddScreen() {
                   </View>
                 </View>
 
-                <Text style={styles.fieldLabel}>Rating</Text>
+                <Text style={styles.fieldLabel}>{t('add.rating')}</Text>
                 <StarRating
                   value={lap.stars}
                   onChange={(stars) => updateLap(ri, li, { stars })}
                 />
 
-                <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Comentario</Text>
+                <Text style={[styles.fieldLabel, { marginTop: 8 }]}>{t('add.comment')}</Text>
                 <TextInput
                   style={styles.input}
                   value={lap.note}
                   onChangeText={(note) => updateLap(ri, li, { note })}
-                  placeholder="Opcional..."
+                  placeholder={t('add.optional')}
                   placeholderTextColor={colors.textTertiary}
                 />
               </View>
@@ -292,14 +332,14 @@ export default function AddScreen() {
 
             <TouchableOpacity style={styles.addLapBtn} onPress={() => addLap(ri)}>
               <Ionicons name="add" size={16} color={colors.primary} />
-              <Text style={styles.addLapText}>Añadir lap</Text>
+              <Text style={styles.addLapText}>{t('add.addLap')}</Text>
             </TouchableOpacity>
           </View>
         ))}
 
         <TouchableOpacity style={styles.addRiverBtn} onPress={addRiver}>
           <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
-          <Text style={styles.addRiverText}>Añadir río</Text>
+          <Text style={styles.addRiverText}>{t('add.addRiver')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -307,9 +347,23 @@ export default function AddScreen() {
           onPress={handleSave}
           disabled={!canSave}
         >
-          <Text style={styles.saveBtnText}>{isEdit ? 'Guardar cambios' : 'Guardar'}</Text>
+          <Text style={styles.saveBtnText}>{isEdit ? t('add.saveChanges') : t('add.save')}</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {mapPickerRi !== null && (
+        <MapPicker
+          visible
+          riverName={rivers[mapPickerRi]?.name || undefined}
+          initialStart={rivers[mapPickerRi]?.startLocation}
+          initialEnd={rivers[mapPickerRi]?.endLocation}
+          onConfirm={(start, end) => {
+            updateRiver(mapPickerRi, { startLocation: start, endLocation: end });
+            setMapPickerRi(null);
+          }}
+          onCancel={() => setMapPickerRi(null)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -439,6 +493,23 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   addLapText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  locationRow: { flexDirection: 'row', gap: 8 },
+  locationBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: '#fff',
+  },
+  locationBtnSet: { borderColor: colors.primary, backgroundColor: `${colors.primary}12` },
+  locationDot: { width: 8, height: 8, borderRadius: 4 },
+  locationBtnText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  locationBtnTextSet: { color: colors.primary },
   addRiverBtn: {
     flexDirection: 'row',
     alignItems: 'center',

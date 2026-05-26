@@ -2,14 +2,10 @@ import React, { useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Day, FilterType } from '../lib/types';
 import { getAvailableYears, getAvailableMonthsForYear } from '../lib/filters';
 import { colors } from '../constants/theme';
-
-const MONTH_NAMES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-];
 
 interface Props {
   days: Day[];
@@ -35,8 +31,10 @@ function countForMonth(days: Day[], year: number, month: number): number {
 }
 
 export default function FilterSheet({ days, filter, onSelect, sheetRef }: Props) {
+  const { t } = useTranslation();
   const snapPoints = useMemo(() => ['50%', '80%'], []);
   const years = getAvailableYears(days);
+  const monthNames = t('months.long', { returnObjects: true }) as string[];
 
   function select(f: FilterType) {
     onSelect(f);
@@ -58,13 +56,13 @@ export default function FilterSheet({ days, filter, onSelect, sheetRef }: Props)
       handleIndicatorStyle={styles.indicator}
     >
       <BottomSheetScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sheetTitle}>Filtrar registros</Text>
+        <Text style={styles.sheetTitle}>{t('filter.title')}</Text>
 
-        <Text style={styles.sectionLabel}>General</Text>
+        <Text style={styles.sectionLabel}>{t('filter.general')}</Text>
         <TouchableOpacity style={styles.row} onPress={() => select({ kind: 'all' })}>
-          <Text style={styles.rowText}>Todos los registros</Text>
+          <Text style={styles.rowText}>{t('filter.allEntries')}</Text>
           <View style={styles.right}>
-            <Text style={styles.count}>{days.length} días</Text>
+            <Text style={styles.count}>{t('filter.days', { count: days.length })}</Text>
             <CheckMark active={filter.kind === 'all'} />
           </View>
         </TouchableOpacity>
@@ -76,9 +74,9 @@ export default function FilterSheet({ days, filter, onSelect, sheetRef }: Props)
             <View key={year}>
               <Text style={styles.sectionLabel}>{year}</Text>
               <TouchableOpacity style={styles.row} onPress={() => select({ kind: 'year', year })}>
-                <Text style={styles.rowText}>Todo {year}</Text>
+                <Text style={styles.rowText}>{t('filter.allYear', { year })}</Text>
                 <View style={styles.right}>
-                  <Text style={styles.count}>{countForYear(days, year)} días</Text>
+                  <Text style={styles.count}>{t('filter.days', { count: countForYear(days, year) })}</Text>
                   <CheckMark active={yearActive} />
                 </View>
               </TouchableOpacity>
@@ -90,9 +88,9 @@ export default function FilterSheet({ days, filter, onSelect, sheetRef }: Props)
                     style={[styles.row, styles.subRow]}
                     onPress={() => select({ kind: 'month', year, month })}
                   >
-                    <Text style={styles.rowText}>{MONTH_NAMES[month - 1]}</Text>
+                    <Text style={styles.rowText}>{monthNames[month - 1]}</Text>
                     <View style={styles.right}>
-                      <Text style={styles.count}>{countForMonth(days, year, month)} días</Text>
+                      <Text style={styles.count}>{t('filter.days', { count: countForMonth(days, year, month) })}</Text>
                       <CheckMark active={monthActive} />
                     </View>
                   </TouchableOpacity>

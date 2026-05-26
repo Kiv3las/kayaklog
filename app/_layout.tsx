@@ -3,10 +3,14 @@ import { Stack, useRouter, useSegments, type Href } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
+import * as WebBrowser from 'expo-web-browser';
 import 'react-native-reanimated';
 import { AppProvider } from '../lib/AppContext';
 import { supabase } from '../lib/supabase';
+import { initLanguage } from '../lib/i18n';
 import { colors } from '../constants/theme';
+
+WebBrowser.maybeCompleteAuthSession();
 
 function AuthGate({ session }: { session: Session | null | undefined }) {
   const segments = useSegments();
@@ -28,14 +32,30 @@ function AuthGate({ session }: { session: Session | null | undefined }) {
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [i18nReady, setI18nReady] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    initLanguage().then(() => setI18nReady(true));
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data }) => {
+      const s = data.session;
+      if (s) {
+        const { error } = await supabase.auth.getUser();
+        if (error?.status === 401 || error?.status === 403) {
+          await supabase.auth.signOut();
+          setSession(null);
+          return;
+        }
+      }
+      setSession(s ?? null);
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSession(s));
     return () => subscription.unsubscribe();
   }, []);
 
-  if (session === undefined) {
+  if (session === undefined || !i18nReady) {
     return (
       <View style={styles.splash}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -51,6 +71,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="map" options={{ headerShown: false }} />
         </Stack>
       </AppProvider>
     </GestureHandlerRootView>

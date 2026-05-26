@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useApp } from '../../lib/AppContext';
 import { FilterType, Day } from '../../lib/types';
@@ -60,6 +61,7 @@ function buildSections(days: Day[], filter: FilterType): Section[] {
 }
 
 export default function LogScreen() {
+  const { t } = useTranslation();
   const { days, deleteDay } = useApp();
   const router = useRouter();
   const sheetRef = useRef<BottomSheet>(null);
@@ -81,11 +83,12 @@ export default function LogScreen() {
     return `${formatDisplayDate(day.date)} · ${km}km · ${laps} lap${laps !== 1 ? 's' : ''}`;
   }
 
+
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Registro</Text>
+        <Text style={styles.title}>{t('log.title')}</Text>
         <GearButton />
       </View>
 
@@ -99,7 +102,7 @@ export default function LogScreen() {
       {filtered.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="water-outline" size={48} color={colors.textTertiary} />
-          <Text style={styles.emptyText}>Sin registros en este período</Text>
+          <Text style={styles.emptyText}>{t('log.empty')}</Text>
         </View>
       ) : (
         <SectionList
@@ -133,7 +136,7 @@ export default function LogScreen() {
 
       <ConfirmDialog
         visible={deleteTarget !== null}
-        title="¿Eliminar este día?"
+        title={t('log.deleteTitle')}
         message={deleteTarget ? deleteInfo(deleteTarget) : ''}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}

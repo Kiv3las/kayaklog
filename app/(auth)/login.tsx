@@ -3,13 +3,16 @@ import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { colors, spacing, radius } from '../../constants/theme';
 
 type Mode = 'login' | 'register';
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>('login');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,6 +22,29 @@ export default function LoginScreen() {
   function switchMode(m: Mode) {
     setMode(m);
     setMessage('');
+    setName('');
+  }
+
+  async function handleForgotPassword() {
+    if (!email) {
+      setIsError(true);
+      setMessage(t('auth.enterEmailFirst'));
+      return;
+    }
+    setMessage('');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) {
+        setIsError(true);
+        setMessage(error.message);
+      } else {
+        setIsError(false);
+        setMessage(t('auth.resetSent'));
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit() {
@@ -30,13 +56,17 @@ export default function LoginScreen() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) { setIsError(true); setMessage(error.message); }
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { name: name.trim() } },
+        });
         if (error) {
           setIsError(true);
           setMessage(error.message);
         } else {
           setIsError(false);
-          setMessage('Cuenta creada. Revisa tu email para confirmarla.');
+          setMessage(t('auth.confirmEmail'));
         }
       }
     } finally {
@@ -44,7 +74,11 @@ export default function LoginScreen() {
     }
   }
 
-  const canSubmit = email.length > 0 && password.length >= 6 && !loading;
+  const canSubmit =
+    email.length > 0 &&
+    password.length >= 6 &&
+    !loading &&
+    (mode === 'login' || name.trim().length > 0);
 
   return (
     <KeyboardAvoidingView
@@ -59,7 +93,7 @@ export default function LoginScreen() {
         {/* Logo */}
         <Text style={styles.emoji}>🚣</Text>
         <Text style={styles.appName}>KayakLog</Text>
-        <Text style={styles.tagline}>Tu bitácora en el agua</Text>
+        <Text style={styles.tagline}>{t('auth.tagline')}</Text>
 
         {/* Mode switcher */}
         <View style={styles.tabs}>
@@ -70,7 +104,7 @@ export default function LoginScreen() {
               onPress={() => switchMode(m)}
             >
               <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
-                {m === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+                {m === 'login' ? t('auth.signIn') : t('auth.register')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -78,9 +112,21 @@ export default function LoginScreen() {
 
         {/* Form */}
         <View style={styles.form}>
+          {mode === 'register' && (
+            <TextInput
+              style={styles.input}
+              placeholder={t('auth.name')}
+              placeholderTextColor={colors.textTertiary}
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+              autoCorrect={false}
+              returnKeyType="next"
+            />
+          )}
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder={t('auth.email')}
             placeholderTextColor={colors.textTertiary}
             value={email}
             onChangeText={setEmail}
@@ -91,7 +137,7 @@ export default function LoginScreen() {
           />
           <TextInput
             style={styles.input}
-            placeholder="Contraseña (mín. 6 caracteres)"
+            placeholder={t('auth.password')}
             placeholderTextColor={colors.textTertiary}
             value={password}
             onChangeText={setPassword}
@@ -118,10 +164,16 @@ export default function LoginScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.btnText}>
-                {mode === 'login' ? 'Entrar' : 'Crear cuenta'}
+                {mode === 'login' ? t('auth.enterBtn') : t('auth.createBtn')}
               </Text>
             )}
           </TouchableOpacity>
+
+          {mode === 'login' && (
+            <TouchableOpacity onPress={handleForgotPassword} disabled={loading} style={styles.forgotBtn}>
+              <Text style={styles.forgotText}>{t('auth.forgotPassword')}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -197,4 +249,6 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { backgroundColor: colors.border },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  forgotBtn: { alignItems: 'center', paddingVertical: 4, marginTop: 4 },
+  forgotText: { color: colors.textTertiary, fontSize: 13 },
 });

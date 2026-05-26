@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { BarChart } from 'react-native-gifted-charts';
 import { addDays, addMonths, addYears, startOfWeek, getMonth, getYear } from 'date-fns';
 import { useApp } from '../../lib/AppContext';
@@ -45,6 +46,7 @@ function navigate(state: PeriodState, dir: 1 | -1): PeriodState {
 }
 
 export default function StatsScreen() {
+  const { t } = useTranslation();
   const { days } = useApp();
   const [period, setPeriod] = useState<PeriodState>({ type: 'week', date: new Date() });
 
@@ -86,18 +88,18 @@ export default function StatsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Estadísticas</Text>
+        <Text style={styles.title}>{t('stats.title')}</Text>
 
         {/* Period type selector */}
         <View style={styles.segmented}>
-          {(['week', 'month', 'year'] as StatsPeriodType[]).map((t) => (
+          {(['week', 'month', 'year'] as StatsPeriodType[]).map((type) => (
             <TouchableOpacity
-              key={t}
-              style={[styles.segment, period.type === t && styles.segmentActive]}
-              onPress={() => setType(t)}
+              key={type}
+              style={[styles.segment, period.type === type && styles.segmentActive]}
+              onPress={() => setType(type)}
             >
-              <Text style={[styles.segmentText, period.type === t && styles.segmentTextActive]}>
-                {t === 'week' ? 'Semana' : t === 'month' ? 'Mes' : 'Año'}
+              <Text style={[styles.segmentText, period.type === type && styles.segmentTextActive]}>
+                {type === 'week' ? t('stats.week') : type === 'month' ? t('stats.month') : t('stats.year')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -112,11 +114,13 @@ export default function StatsScreen() {
             <Text style={styles.navLabel}>{periodLabel(period)}</Text>
             {current ? (
               <View style={styles.currentBadge}>
-                <Text style={styles.currentBadgeText}>Actual</Text>
+                <Text style={styles.currentBadgeText}>{t('stats.current')}</Text>
               </View>
             ) : (
               <TouchableOpacity onPress={() => setPeriod((p) => ({ ...p, date: new Date() }))}>
-                <Text style={styles.backLink}>Volver a {period.type === 'week' ? 'esta semana' : period.type === 'month' ? 'este mes' : 'este año'}</Text>
+                <Text style={styles.backLink}>
+                  {period.type === 'week' ? t('stats.backToWeek') : period.type === 'month' ? t('stats.backToMonth') : t('stats.backToYear')}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -131,17 +135,17 @@ export default function StatsScreen() {
 
         {/* Stats cards */}
         <View style={styles.grid}>
-          <StatCard label="Kilómetros" value={`${stats.km}`} icon="speedometer-outline" />
-          <StatCard label="Tiempo" value={formatTime(stats.timeMinutes)} icon="time-outline" />
-          <StatCard label="Laps" value={`${stats.laps}`} icon="repeat-outline" />
-          <StatCard label="Días" value={`${stats.days}`} icon="calendar-outline" />
+          <StatCard label={t('stats.km')} value={`${stats.km}`} icon="speedometer-outline" />
+          <StatCard label={t('stats.time')} value={formatTime(stats.timeMinutes)} icon="time-outline" />
+          <StatCard label={t('stats.laps')} value={`${stats.laps}`} icon="repeat-outline" />
+          <StatCard label={t('stats.days')} value={`${stats.days}`} icon="calendar-outline" />
           <StatCard
-            label="Ríos / Países"
+            label={t('stats.riversCountries')}
             value={`${stats.rivers} / ${stats.countries}`}
             icon="water-outline"
           />
           <StatCard
-            label="Rating promedio"
+            label={t('stats.avgRating')}
             value={stats.avgRating > 0 ? `${stats.avgRating} ⭐` : '—'}
             icon="star-outline"
           />
@@ -149,9 +153,11 @@ export default function StatsScreen() {
 
         {/* Bar chart */}
         <View style={styles.chartCard}>
-          <Text style={styles.chartLabel}>Kilómetros por {period.type === 'week' ? 'día' : period.type === 'month' ? 'semana' : 'mes'}</Text>
+          <Text style={styles.chartLabel}>
+            {period.type === 'week' ? t('stats.kmPerDay') : period.type === 'month' ? t('stats.kmPerWeek') : t('stats.kmPerMonth')}
+          </Text>
           {chartData.every((d) => d.value === 0) ? (
-            <Text style={styles.noData}>Sin datos en este período</Text>
+            <Text style={styles.noData}>{t('stats.noData')}</Text>
           ) : (
             <BarChart
               data={chartData}

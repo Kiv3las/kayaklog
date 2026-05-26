@@ -17,12 +17,14 @@ interface AppContextValue {
   days: Day[];
   settings: Settings;
   user: User | null;
+  displayName: string;
   isLoading: boolean;
   isSyncing: boolean;
   addDay: (day: Day) => Promise<void>;
   updateDay: (day: Day) => Promise<void>;
   deleteDay: (id: number) => Promise<void>;
   updateSettings: (settings: Settings) => Promise<void>;
+  updateName: (name: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -90,10 +92,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Check existing session on mount
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
+    // Check existing session on mount — validate server-side; tolerate offline
+    supabase.auth.getUser().then(async ({ data, error }) => {
+      let currentUser = data.user;
+      if (error && !data.user) {
+        if (error.status !== 401 && error.status !== 403) {
+          // Network error — fall back to cached session so app works offline
+          const { data: { session } } = await supabase.auth.getSession();
+          currentUser = session?.user ?? null;
+        }
+      }
+      setUser(currentUser ?? null);
       if (currentUser) {
         await loadUserData(currentUser.id);
       } else {
@@ -145,14 +154,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (user) void upsertSettings(newSettings, user.id);
   }, [user, days]);
 
+  const updateName = useCallback(async (name: string) => {
+    const { data } = await supabase.auth.updateUser({ data: { name } });
+    if (data.user) setUser(data.user);
+  }, []);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
 
+  const displayName: string = user?.user_metadata?.name ?? 'paddler';
+
   return (
     <AppContext.Provider value={{
-      days, settings, user, isLoading, isSyncing,
-      addDay, updateDay, deleteDay, updateSettings, signOut,
+      days, settings, user, displayName, isLoading, isSyncing,
+      addDay, updateDay, deleteDay, updateSettings, updateName, signOut,
     }}>
       {children}
     </AppContext.Provider>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { colors } from '../constants/theme';
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function NotificationBanner({ time }: Props) {
+  const { t } = useTranslation();
   return (
     <View style={styles.banner}>
       <View style={styles.appIcon}>
@@ -18,8 +20,8 @@ export default function NotificationBanner({ time }: Props) {
           <Text style={styles.appName}>KayakLog</Text>
           <Text style={styles.time}>{time}</Text>
         </View>
-        <Text style={styles.title}>Kayak</Text>
-        <Text style={styles.body}>¿Remaste hoy? Añade un registro</Text>
+        <Text style={styles.title}>{t('notif.title')}</Text>
+        <Text style={styles.body}>{t('notif.body')}</Text>
       </View>
     </View>
   );

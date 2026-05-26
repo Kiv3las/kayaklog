@@ -1,4 +1,5 @@
-import { startOfWeek, format, addDays, differenceInCalendarDays, parseISO as dfnsParseISO } from 'date-fns';
+import { startOfWeek, format, addDays, differenceInCalendarDays } from 'date-fns';
+import i18n from './i18n';
 
 export function todayISO(): string {
   return format(new Date(), 'yyyy-MM-dd');
@@ -26,26 +27,28 @@ export function addDaysToISO(iso: string, days: number): string {
   return isoFromDate(addDays(parseDateISO(iso), days));
 }
 
+function shortMonth(idx: number): string {
+  return (i18n.t('months.short', { returnObjects: true }) as string[])[idx] ?? '';
+}
+
 export function formatDisplayDate(iso: string): string {
-  return format(parseDateISO(iso), 'dd MMM yyyy');
+  const d = parseDateISO(iso);
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${day} ${shortMonth(d.getMonth())} ${d.getFullYear()}`;
 }
 
 export function formatMonthYear(year: number, month: number): string {
-  const months = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-  ];
-  return `${months[month - 1]} ${year}`;
+  const name = (i18n.t('months.long', { returnObjects: true }) as string[])[month - 1] ?? '';
+  return `${name} ${year}`;
 }
 
 export function monthName(month: number): string {
-  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  return months[month - 1];
+  return shortMonth(month - 1);
 }
 
 export function weekRangeLabel(monday: Date): string {
   const sunday = addDays(monday, 6);
-  const m = format(monday, 'dd MMM');
-  const s = format(sunday, 'dd MMM yyyy');
+  const m = `${String(monday.getDate()).padStart(2, '0')} ${shortMonth(monday.getMonth())}`;
+  const s = `${String(sunday.getDate()).padStart(2, '0')} ${shortMonth(sunday.getMonth())} ${sunday.getFullYear()}`;
   return `${m} – ${s}`;
 }

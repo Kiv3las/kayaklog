@@ -5,6 +5,7 @@ import {
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../lib/AppContext';
 import { computeStreaks } from '../../lib/streak';
 import { statsForDays, formatTime } from '../../lib/stats';
@@ -12,12 +13,14 @@ import { formatDisplayDate, todayISO } from '../../lib/dates';
 import { countryByCode } from '../../lib/countries';
 import StreakWidget from '../../components/StreakWidget';
 import GearButton from '../../components/GearButton';
+import PaddleIcon from '../../components/PaddleIcon';
 import { colors, spacing, radius } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 
 export default function InicioScreen() {
-  const { days, isLoading } = useApp();
+  const { t } = useTranslation();
+  const { days, isLoading, displayName } = useApp();
   const router = useRouter();
   const currentYear = new Date().getFullYear();
   const { current: streak } = useMemo(() => computeStreaks(days), [days]);
@@ -39,7 +42,7 @@ export default function InicioScreen() {
   const yearStats = useMemo(() => statsForDays(yearDays), [yearDays]);
   const lastDay = days[0];
 
-  if (isLoading) return <View style={styles.loading}><Text>Cargando...</Text></View>;
+  if (isLoading) return <View style={styles.loading}><Text>{t('home.loading')}</Text></View>;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -59,8 +62,15 @@ export default function InicioScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Hola, paddler 🏄</Text>
-            <Text style={styles.subtitle}>Tu año en el agua</Text>
+            <View style={styles.greetingRow}>
+              <Text style={styles.greeting}>{t('home.hello', { name: displayName })}</Text>
+              <PaddleIcon size={26} color={colors.primary} />
+            </View>
+            <Text style={styles.subtitle}>
+              {yearStats.days > 0
+                ? t('home.yearStats', { km: yearStats.km, days: yearStats.days })
+                : t('home.yearSubtitle')}
+            </Text>
           </View>
           <GearButton />
         </View>
@@ -70,27 +80,27 @@ export default function InicioScreen() {
 
         {/* Season card */}
         <View style={styles.seasonCard}>
-          <Text style={styles.seasonTitle}>Temporada {currentYear}</Text>
+          <Text style={styles.seasonTitle}>{t('home.season', { year: currentYear })}</Text>
           <View style={styles.statsGrid}>
-            <StatItem label="Kilómetros" value={`${yearStats.km}`} icon="speedometer-outline" />
-            <StatItem label="Laps" value={`${yearStats.laps}`} icon="repeat-outline" />
-            <StatItem label="Tiempo" value={formatTime(yearStats.timeMinutes)} icon="time-outline" />
-            <StatItem label="Ríos" value={`${yearStats.rivers}`} icon="water-outline" />
-            <StatItem label="Países" value={`${yearStats.countries}`} icon="globe-outline" />
-            <StatItem label="Días" value={`${yearStats.days}`} icon="calendar-outline" />
+            <StatItem label={t('home.km')} value={`${yearStats.km}`} icon="speedometer-outline" />
+            <StatItem label={t('home.laps')} value={`${yearStats.laps}`} icon="repeat-outline" />
+            <StatItem label={t('home.time')} value={formatTime(yearStats.timeMinutes)} icon="time-outline" />
+            <StatItem label={t('home.rivers')} value={`${yearStats.rivers}`} icon="water-outline" />
+            <StatItem label={t('home.countries')} value={`${yearStats.countries}`} icon="globe-outline" />
+            <StatItem label={t('home.days')} value={`${yearStats.days}`} icon="calendar-outline" />
           </View>
         </View>
 
         {/* Last day */}
         {lastDay && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Última salida</Text>
+            <Text style={styles.cardTitle}>{t('home.lastTrip')}</Text>
             <Text style={styles.lastDate}>{formatDisplayDate(lastDay.date)}</Text>
             {lastDay.rivers.map((r, i) => {
               const c = countryByCode[r.country];
               return (
                 <Text key={i} style={styles.lastRiver}>
-                  {c?.flag} {r.name} · Clase {r.difficulty}
+                  {c?.flag} {r.name} · {t('rivers.class', { level: r.difficulty })}
                 </Text>
               );
             })}
@@ -104,14 +114,21 @@ export default function InicioScreen() {
             onPress={() => router.push('/(tabs)/add')}
           >
             <Ionicons name="add-circle-outline" size={20} color="#fff" />
-            <Text style={styles.actionText}>Nuevo día</Text>
+            <Text style={styles.actionText}>{t('home.newDay')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border }]}
             onPress={() => router.push('/(tabs)/stats')}
           >
             <Ionicons name="bar-chart-outline" size={20} color={colors.primary} />
-            <Text style={[styles.actionText, { color: colors.primary }]}>Estadísticas</Text>
+            <Text style={[styles.actionText, { color: colors.primary }]}>{t('home.stats')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border }]}
+            onPress={() => router.push('/map' as any)}
+          >
+            <Ionicons name="map-outline" size={20} color={colors.primary} />
+            <Text style={[styles.actionText, { color: colors.primary }]}>{t('home.myRoutes')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -139,6 +156,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: spacing.md,
   },
+  greetingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   greeting: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 2 },
   seasonCard: {

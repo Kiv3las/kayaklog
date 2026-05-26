@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { colors } from '../constants/theme';
 
 interface Props {
@@ -13,7 +14,9 @@ interface Props {
   confirmLabel?: string;
 }
 
-export default function ConfirmDialog({ visible, title, message, detail, onConfirm, onCancel, confirmLabel = 'Eliminar' }: Props) {
+export default function ConfirmDialog({ visible, title, message, detail, onConfirm, onCancel, confirmLabel }: Props) {
+  const { t } = useTranslation();
+  const resolvedConfirmLabel = confirmLabel ?? t('confirm.delete');
   const scale = useRef(new Animated.Value(0.8)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -39,13 +42,13 @@ export default function ConfirmDialog({ visible, title, message, detail, onConfi
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
           {detail && <Text style={styles.detail}>{detail}</Text>}
-          <Text style={styles.warning}>Esta acción no se puede deshacer.</Text>
+          <Text style={styles.warning}>{t('confirm.cannotUndo')}</Text>
           <View style={styles.btnRow}>
             <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={onCancel}>
-              <Text style={styles.cancelText}>Cancelar</Text>
+              <Text style={styles.cancelText}>{t('confirm.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.btn, styles.dangerBtn]} onPress={onConfirm}>
-              <Text style={styles.dangerText}>{confirmLabel}</Text>
+              <Text style={styles.dangerText}>{resolvedConfirmLabel}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>

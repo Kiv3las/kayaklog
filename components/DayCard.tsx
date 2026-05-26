@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Day } from '../lib/types';
 import { formatDisplayDate } from '../lib/dates';
 import { countryByCode } from '../lib/countries';
@@ -31,6 +32,7 @@ function formatTime(h: number, m: number): string {
 }
 
 export default function DayCard({ day, onEdit, onDelete }: Props) {
+  const { t } = useTranslation();
   const avg = avgStars(day);
 
   return (
@@ -41,10 +43,10 @@ export default function DayCard({ day, onEdit, onDelete }: Props) {
           {avg > 0 && <StarsDisplay value={avg} />}
         </View>
         <View style={styles.actions}>
-          <TouchableOpacity onPress={onEdit} style={styles.iconBtn} accessibilityLabel="Editar día">
+          <TouchableOpacity onPress={onEdit} style={styles.iconBtn} accessibilityLabel={t('dayCard.editDay')}>
             <Ionicons name="pencil" size={18} color={colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={onDelete} style={styles.iconBtn} accessibilityLabel="Eliminar día">
+          <TouchableOpacity onPress={onDelete} style={styles.iconBtn} accessibilityLabel={t('dayCard.deleteDay')}>
             <Ionicons name="trash-outline" size={18} color={colors.danger} />
           </TouchableOpacity>
         </View>
@@ -58,7 +60,7 @@ export default function DayCard({ day, onEdit, onDelete }: Props) {
               <Text style={styles.flag}>{country?.flag ?? '🏳️'}</Text>
               <Text style={styles.riverName}>{river.name}</Text>
               <View style={styles.diffBadge}>
-                <Text style={styles.diffText}>Clase {river.difficulty}</Text>
+                <Text style={styles.diffText}>{t('dayCard.class', { level: river.difficulty })}</Text>
               </View>
             </View>
             {river.laps.map((lap, li) => (

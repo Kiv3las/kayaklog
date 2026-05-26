@@ -2,6 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, StyleSheet, GestureResponderEvent } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { colors } from '../../constants/theme';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
@@ -21,6 +22,7 @@ function AddTabButton({ onPress }: { onPress?: ((e: GestureResponderEvent) => vo
 }
 
 export default function TabLayout() {
+  const { t } = useTranslation();
   return (
     <Tabs
       screenOptions={{
@@ -30,8 +32,8 @@ export default function TabLayout() {
         tabBarStyle: { borderTopColor: colors.border, overflow: 'visible' },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Inicio', tabBarIcon: ({ focused }) => tabIcon('home', focused, 'home-outline') }} />
-      <Tabs.Screen name="log" options={{ title: 'Registro', tabBarIcon: ({ focused }) => tabIcon('list', focused, 'list-outline') }} />
+      <Tabs.Screen name="index" options={{ title: t('tabs.home'), tabBarIcon: ({ focused }) => tabIcon('home', focused, 'home-outline') }} />
+      <Tabs.Screen name="log" options={{ title: t('tabs.log'), tabBarIcon: ({ focused }) => tabIcon('list', focused, 'list-outline') }} />
       <Tabs.Screen
         name="add"
         options={{
@@ -39,8 +41,8 @@ export default function TabLayout() {
           tabBarButton: (props) => <AddTabButton onPress={props.onPress as ((e: GestureResponderEvent) => void) | null} />,
         }}
       />
-      <Tabs.Screen name="stats" options={{ title: 'Stats', tabBarIcon: ({ focused }) => tabIcon('bar-chart', focused, 'bar-chart-outline') }} />
-      <Tabs.Screen name="rivers" options={{ title: 'Mis ríos', tabBarIcon: ({ focused }) => tabIcon('water', focused, 'water-outline') }} />
+      <Tabs.Screen name="stats" options={{ title: t('tabs.stats'), tabBarIcon: ({ focused }) => tabIcon('bar-chart', focused, 'bar-chart-outline') }} />
+      <Tabs.Screen name="rivers" options={{ title: t('tabs.rivers'), tabBarIcon: ({ focused }) => tabIcon('water', focused, 'water-outline') }} />
     </Tabs>
   );
 }

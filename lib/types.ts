@@ -1,3 +1,8 @@
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
 export interface Lap {
   km: number;
   hours: number;
@@ -11,6 +16,8 @@ export interface River {
   country: string;
   difficulty: 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI';
   laps: Lap[];
+  startLocation?: LatLng;
+  endLocation?: LatLng;
 }
 
 export interface Day {

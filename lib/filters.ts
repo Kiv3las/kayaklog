@@ -1,5 +1,6 @@
 import { Day } from './types';
 import { FilterType } from './types';
+import i18n from './i18n';
 
 export function applyFilter(days: Day[], filter: FilterType): Day[] {
   if (filter.kind === 'all') return days;
@@ -25,11 +26,8 @@ export function getAvailableMonthsForYear(days: Day[], year: number): number[] {
 }
 
 export function filterLabel(filter: FilterType): string {
-  if (filter.kind === 'all') return 'Todos';
+  if (filter.kind === 'all') return i18n.t('filter.allEntries');
   if (filter.kind === 'year') return `${filter.year}`;
-  const months = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-  ];
+  const months = i18n.t('months.long', { returnObjects: true }) as string[];
   return `${months[filter.month - 1]} ${filter.year}`;
 }

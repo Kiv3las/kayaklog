@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Day, Difficulty } from '../lib/types';
 import { countryByCode } from '../lib/countries';
 import { colors } from '../constants/theme';
@@ -36,6 +37,7 @@ function buildDict(days: Day[]): RiverSuggestion[] {
 }
 
 export default function RiverAutocomplete({ value, onChange, onSelect, days, placeholder }: Props) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const suggestions = useMemo(() => buildDict(days), [days]);
 
@@ -51,7 +53,7 @@ export default function RiverAutocomplete({ value, onChange, onSelect, days, pla
         onChangeText={onChange}
         onFocus={() => setFocused(true)}
         onBlur={() => setTimeout(() => setFocused(false), 150)}
-        placeholder={placeholder ?? 'Nombre del río'}
+        placeholder={placeholder ?? t('autocomplete.placeholder')}
         placeholderTextColor={colors.textTertiary}
         returnKeyType="done"
       />
@@ -68,7 +70,7 @@ export default function RiverAutocomplete({ value, onChange, onSelect, days, pla
                 <Text style={styles.flag}>{country?.flag ?? '🏳️'}</Text>
                 <View style={styles.suggestionInfo}>
                   <Text style={styles.suggestionName}>{s.name}</Text>
-                  <Text style={styles.suggestionDetail}>{s.count} salida{s.count !== 1 ? 's' : ''} · Clase {s.difficulty}</Text>
+                  <Text style={styles.suggestionDetail}>{t('autocomplete.trips', { count: s.count })} · {t('autocomplete.detail', { level: s.difficulty })}</Text>
                 </View>
               </TouchableOpacity>
             );

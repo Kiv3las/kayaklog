@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../lib/AppContext';
 import { FilterType } from '../../lib/types';
 import { applyFilter, filterLabel } from '../../lib/filters';
@@ -49,6 +50,7 @@ function buildSections(rivers: RiverStat[]): CountrySection[] {
 }
 
 export default function RiversScreen() {
+  const { t } = useTranslation();
   const { days } = useApp();
   const sheetRef = useRef<BottomSheet>(null);
   const [filter, setFilter] = useState<FilterType>({ kind: 'all' });
@@ -60,7 +62,7 @@ export default function RiversScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>Mis ríos</Text>
+        <Text style={styles.title}>{t('rivers.title')}</Text>
         <GearButton />
       </View>
 
@@ -73,7 +75,7 @@ export default function RiversScreen() {
       {sections.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="water-outline" size={48} color={colors.textTertiary} />
-          <Text style={styles.emptyText}>Sin ríos en este período</Text>
+          <Text style={styles.emptyText}>{t('rivers.empty')}</Text>
         </View>
       ) : (
         <SectionList
@@ -82,15 +84,7 @@ export default function RiversScreen() {
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => (
-            <View style={styles.countryHeader}>
-              <Text style={styles.countryFlag}>{section.flag}</Text>
-              <View style={styles.countryInfo}>
-                <Text style={styles.countryName}>{section.title}</Text>
-                <Text style={styles.countryMeta}>
-                  {section.totalRivers} río{section.totalRivers !== 1 ? 's' : ''} · {section.totalKm} km
-                </Text>
-              </View>
-            </View>
+            <RiversSectionHeader section={section} />
           )}
           renderItem={({ item }) => <RiverRow river={item} />}
         />
@@ -106,13 +100,29 @@ export default function RiversScreen() {
   );
 }
 
+function RiversSectionHeader({ section }: { section: CountrySection }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.countryHeader}>
+      <Text style={styles.countryFlag}>{section.flag}</Text>
+      <View style={styles.countryInfo}>
+        <Text style={styles.countryName}>{section.title}</Text>
+        <Text style={styles.countryMeta}>
+          {t('rivers.count', { count: section.totalRivers })} · {section.totalKm} {t('rivers.km')}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 function RiverRow({ river }: { river: RiverStat }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.riverCard}>
       <View style={styles.riverTop}>
         <Text style={styles.riverName}>{river.name}</Text>
         <View style={styles.diffBadge}>
-          <Text style={styles.diffText}>Clase {river.difficulty}</Text>
+          <Text style={styles.diffText}>{t('rivers.class', { level: river.difficulty })}</Text>
         </View>
       </View>
       {river.avgRating > 0 && (

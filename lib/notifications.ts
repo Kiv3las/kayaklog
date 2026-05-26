@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Day, Settings } from './types';
 import { todayISO } from './dates';
+import i18n from './i18n';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -20,8 +21,8 @@ export async function requestPermission(): Promise<boolean> {
 export async function scheduleDaily(hour: number, minute: number): Promise<void> {
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Kayak',
-      body: '¿Remaste hoy? Añade un registro',
+      title: i18n.t('notif.title'),
+      body: i18n.t('notif.body'),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
