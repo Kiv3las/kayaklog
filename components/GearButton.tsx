@@ -2,9 +2,10 @@ import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { colors } from '../constants/theme';
+import { useTheme } from '../lib/themeContext';
 
 export default function GearButton() {
+  const { colors } = useTheme();
   const router = useRouter();
   return (
     <TouchableOpacity
@@ -18,7 +19,5 @@ export default function GearButton() {
 }
 
 const styles = StyleSheet.create({
-  btn: {
-    padding: 4,
-  },
+  btn: { padding: 4 },
 });

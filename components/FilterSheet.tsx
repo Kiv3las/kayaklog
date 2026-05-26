@@ -1,11 +1,12 @@
-import React, { useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../lib/themeContext';
+import type { Colors } from '../constants/theme';
 import { Day, FilterType } from '../lib/types';
 import { getAvailableYears, getAvailableMonthsForYear } from '../lib/filters';
-import { colors } from '../constants/theme';
 
 interface Props {
   days: Day[];
@@ -30,8 +31,51 @@ function countForMonth(days: Day[], year: number, month: number): number {
   return days.filter((d) => d.date.startsWith(prefix)).length;
 }
 
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    sheetBg: { backgroundColor: c.cardBg, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+    indicator: { backgroundColor: c.border },
+    content: { paddingHorizontal: 16, paddingBottom: 32 },
+    sheetTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: c.textPrimary,
+      textAlign: 'center',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+      marginBottom: 8,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: c.textTertiary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginTop: 12,
+      marginBottom: 4,
+      paddingHorizontal: 4,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    subRow: { paddingLeft: 16 },
+    rowText: { fontSize: 15, color: c.textPrimary },
+    right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    count: { fontSize: 13, color: c.textTertiary },
+  });
+}
+
 export default function FilterSheet({ days, filter, onSelect, sheetRef }: Props) {
   const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const snapPoints = useMemo(() => ['50%', '80%'], []);
   const years = getAvailableYears(days);
   const monthNames = t('months.long', { returnObjects: true }) as string[];
@@ -103,63 +147,3 @@ export default function FilterSheet({ days, filter, onSelect, sheetRef }: Props)
     </BottomSheet>
   );
 }
-
-const styles = StyleSheet.create({
-  sheetBg: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  indicator: {
-    backgroundColor: '#ccc',
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-  },
-  sheetTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    textAlign: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: 8,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 12,
-    marginBottom: 4,
-    paddingHorizontal: 4,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  subRow: {
-    paddingLeft: 16,
-  },
-  rowText: {
-    fontSize: 15,
-    color: colors.textPrimary,
-  },
-  right: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  count: {
-    fontSize: 13,
-    color: colors.textTertiary,
-  },
-});

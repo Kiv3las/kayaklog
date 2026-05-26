@@ -134,6 +134,10 @@ const en: Translations = {
     langAuto: 'Auto (device)',
     langEs: 'Español',
     langEn: 'English',
+    appearance: 'Appearance',
+    appearanceAuto: 'Auto',
+    appearanceLight: 'Light',
+    appearanceDark: 'Dark',
   },
   map: {
     title: 'My routes',

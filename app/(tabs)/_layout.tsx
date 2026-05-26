@@ -3,18 +3,20 @@ import { View, TouchableOpacity, StyleSheet, GestureResponderEvent } from 'react
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { colors } from '../../constants/theme';
+import { useTheme } from '../../lib/themeContext';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
-function tabIcon(name: IoniconsName, focused: boolean, outlineName: IoniconsName) {
+function TabIcon({ name, focused, outlineName }: { name: IoniconsName; focused: boolean; outlineName: IoniconsName }) {
+  const { colors } = useTheme();
   return <Ionicons name={focused ? name : outlineName} size={24} color={focused ? colors.primary : colors.textTertiary} />;
 }
 
 function AddTabButton({ onPress }: { onPress?: ((e: GestureResponderEvent) => void) | null }) {
+  const { colors } = useTheme();
   return (
     <TouchableOpacity style={styles.addBtn} onPress={onPress ?? undefined} activeOpacity={0.85} accessibilityLabel="Nuevo día">
-      <View style={styles.addBtnCircle}>
+      <View style={[styles.addBtnCircle, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
         <Ionicons name="add" size={32} color="#fff" />
       </View>
     </TouchableOpacity>
@@ -23,17 +25,23 @@ function AddTabButton({ onPress }: { onPress?: ((e: GestureResponderEvent) => vo
 
 export default function TabLayout() {
   const { t } = useTranslation();
+  const { colors } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
-        tabBarStyle: { borderTopColor: colors.border, overflow: 'visible' },
+        tabBarStyle: {
+          borderTopColor: colors.border,
+          backgroundColor: colors.cardBg,
+          overflow: 'visible',
+        },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: t('tabs.home'), tabBarIcon: ({ focused }) => tabIcon('home', focused, 'home-outline') }} />
-      <Tabs.Screen name="log" options={{ title: t('tabs.log'), tabBarIcon: ({ focused }) => tabIcon('list', focused, 'list-outline') }} />
+      <Tabs.Screen name="index" options={{ title: t('tabs.home'), tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} outlineName="home-outline" /> }} />
+      <Tabs.Screen name="log" options={{ title: t('tabs.log'), tabBarIcon: ({ focused }) => <TabIcon name="list" focused={focused} outlineName="list-outline" /> }} />
       <Tabs.Screen
         name="add"
         options={{
@@ -41,27 +49,20 @@ export default function TabLayout() {
           tabBarButton: (props) => <AddTabButton onPress={props.onPress as ((e: GestureResponderEvent) => void) | null} />,
         }}
       />
-      <Tabs.Screen name="stats" options={{ title: t('tabs.stats'), tabBarIcon: ({ focused }) => tabIcon('bar-chart', focused, 'bar-chart-outline') }} />
-      <Tabs.Screen name="rivers" options={{ title: t('tabs.rivers'), tabBarIcon: ({ focused }) => tabIcon('water', focused, 'water-outline') }} />
+      <Tabs.Screen name="stats" options={{ title: t('tabs.stats'), tabBarIcon: ({ focused }) => <TabIcon name="bar-chart" focused={focused} outlineName="bar-chart-outline" /> }} />
+      <Tabs.Screen name="rivers" options={{ title: t('tabs.rivers'), tabBarIcon: ({ focused }) => <TabIcon name="water" focused={focused} outlineName="water-outline" /> }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  addBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    top: -16,
-  },
+  addBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', top: -16 },
   addBtnCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.45,
     shadowRadius: 8,

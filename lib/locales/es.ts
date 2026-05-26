@@ -132,6 +132,10 @@ const es = {
     langAuto: 'Automático (dispositivo)',
     langEs: 'Español',
     langEn: 'English',
+    appearance: 'Apariencia',
+    appearanceAuto: 'Automático',
+    appearanceLight: 'Claro',
+    appearanceDark: 'Oscuro',
   },
   map: {
     title: 'Mis rutas',

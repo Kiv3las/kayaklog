@@ -6,9 +6,9 @@ import type { Session } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import 'react-native-reanimated';
 import { AppProvider } from '../lib/AppContext';
+import { ThemeProvider, useTheme } from '../lib/themeContext';
 import { supabase } from '../lib/supabase';
 import { initLanguage } from '../lib/i18n';
-import { colors } from '../constants/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -17,8 +17,7 @@ function AuthGate({ session }: { session: Session | null | undefined }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (session === undefined) return; // still resolving
-
+    if (session === undefined) return;
     const inAuth = (segments[0] as string) === '(auth)';
     if (!session && !inAuth) {
       router.replace('/(auth)/login' as Href);
@@ -30,7 +29,8 @@ function AuthGate({ session }: { session: Session | null | undefined }) {
   return null;
 }
 
-export default function RootLayout() {
+function RootContent() {
+  const { colors } = useTheme();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [i18nReady, setI18nReady] = useState(false);
 
@@ -57,23 +57,31 @@ export default function RootLayout() {
 
   if (session === undefined || !i18nReady) {
     return (
-      <View style={styles.splash}>
+      <View style={[styles.splash, { backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
+    <AppProvider>
+      <AuthGate session={session} />
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="map" options={{ headerShown: false }} />
+      </Stack>
+    </AppProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
     <GestureHandlerRootView style={styles.root}>
-      <AppProvider>
-        <AuthGate session={session} />
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="map" options={{ headerShown: false }} />
-        </Stack>
-      </AppProvider>
+      <ThemeProvider>
+        <RootContent />
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

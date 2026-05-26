@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { colors } from '../constants/theme';
+import { useTheme } from '../lib/themeContext';
+import type { Colors } from '../constants/theme';
 
 interface Props {
   visible: boolean;
@@ -14,8 +15,70 @@ interface Props {
   confirmLabel?: string;
 }
 
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+    },
+    card: {
+      backgroundColor: c.cardBg,
+      borderRadius: 16,
+      padding: 24,
+      width: '100%',
+      alignItems: 'center',
+    },
+    iconWrap: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: c.danger,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: c.textPrimary,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    message: {
+      fontSize: 15,
+      color: c.textSecondary,
+      textAlign: 'center',
+      marginBottom: 4,
+    },
+    detail: {
+      fontSize: 13,
+      color: c.textTertiary,
+      textAlign: 'center',
+      marginBottom: 4,
+    },
+    warning: {
+      fontSize: 12,
+      color: c.danger,
+      textAlign: 'center',
+      marginBottom: 20,
+      fontStyle: 'italic',
+    },
+    btnRow: { flexDirection: 'row', gap: 12, width: '100%' },
+    btn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+    cancelBtn: { backgroundColor: c.primary },
+    dangerBtn: { backgroundColor: c.danger },
+    cancelText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+    dangerText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  });
+}
+
 export default function ConfirmDialog({ visible, title, message, detail, onConfirm, onCancel, confirmLabel }: Props) {
   const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const resolvedConfirmLabel = confirmLabel ?? t('confirm.delete');
   const scale = useRef(new Animated.Value(0.8)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -56,82 +119,3 @@ export default function ConfirmDialog({ visible, title, message, detail, onConfi
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    alignItems: 'center',
-  },
-  iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  message: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  detail: {
-    fontSize: 13,
-    color: colors.textTertiary,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  warning: {
-    fontSize: 12,
-    color: colors.danger,
-    textAlign: 'center',
-    marginBottom: 20,
-    fontStyle: 'italic',
-  },
-  btnRow: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  btn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  cancelBtn: {
-    backgroundColor: colors.primary,
-  },
-  dangerBtn: {
-    backgroundColor: colors.danger,
-  },
-  cancelText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  dangerText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-});

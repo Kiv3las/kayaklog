@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../lib/themeContext';
+import type { Colors } from '../constants/theme';
 import { Day, Difficulty } from '../lib/types';
 import { countryByCode } from '../lib/countries';
-import { colors } from '../constants/theme';
 
 interface RiverSuggestion {
   name: string;
@@ -36,8 +37,51 @@ function buildDict(days: Day[]): RiverSuggestion[] {
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
 }
 
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    input: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: c.textPrimary,
+      backgroundColor: c.cardBg,
+    },
+    dropdown: {
+      backgroundColor: c.cardBg,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 8,
+      marginTop: 2,
+      overflow: 'hidden',
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      zIndex: 100,
+    },
+    suggestion: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 10,
+      gap: 8,
+    },
+    suggestionBorder: { borderBottomWidth: 1, borderBottomColor: c.border },
+    flag: { fontSize: 18 },
+    suggestionInfo: { flex: 1 },
+    suggestionName: { fontSize: 14, fontWeight: '600', color: c.textPrimary },
+    suggestionDetail: { fontSize: 12, color: c.textTertiary },
+  });
+}
+
 export default function RiverAutocomplete({ value, onChange, onSelect, days, placeholder }: Props) {
   const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [focused, setFocused] = useState(false);
   const suggestions = useMemo(() => buildDict(days), [days]);
 
@@ -80,56 +124,3 @@ export default function RiverAutocomplete({ value, onChange, onSelect, days, pla
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.textPrimary,
-    backgroundColor: '#fff',
-  },
-  dropdown: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    marginTop: 2,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    zIndex: 100,
-  },
-  suggestion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  suggestionBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  flag: {
-    fontSize: 18,
-  },
-  suggestionInfo: {
-    flex: 1,
-  },
-  suggestionName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  suggestionDetail: {
-    fontSize: 12,
-    color: colors.textTertiary,
-  },
-});

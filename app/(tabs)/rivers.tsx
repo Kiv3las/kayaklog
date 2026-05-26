@@ -1,20 +1,21 @@
 import React, { useRef, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, SectionList, TouchableOpacity,
-  SafeAreaView,
+  View, Text, StyleSheet, SectionList, TouchableOpacity, SafeAreaView,
 } from 'react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../../lib/AppContext';
+import { useTheme } from '../../lib/themeContext';
+import type { Colors } from '../../constants/theme';
 import { FilterType } from '../../lib/types';
 import { applyFilter, filterLabel } from '../../lib/filters';
 import { aggregateRivers, formatTime, RiverStat } from '../../lib/stats';
-import { countryByCode, COUNTRIES } from '../../lib/countries';
+import { countryByCode } from '../../lib/countries';
+import { spacing, radius } from '../../constants/theme';
 import StarsDisplay from '../../components/StarsDisplay';
 import FilterSheet from '../../components/FilterSheet';
 import GearButton from '../../components/GearButton';
-import { colors, spacing, radius } from '../../constants/theme';
 
 interface CountrySection {
   title: string;
@@ -32,7 +33,6 @@ function buildSections(rivers: RiverStat[]): CountrySection[] {
     list.push(r);
     byCountry.set(r.country, list);
   }
-
   return Array.from(byCountry.entries())
     .map(([code, list]) => {
       const country = countryByCode[code];
@@ -49,8 +49,88 @@ function buildSections(rivers: RiverStat[]): CountrySection[] {
     .sort((a, b) => b.totalKm - a.totalKm);
 }
 
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: c.bg },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.sm,
+    },
+    title: { fontSize: 22, fontWeight: '800', color: c.textPrimary },
+    filterBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.sm,
+      backgroundColor: c.cardBg,
+      borderRadius: radius.sm,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+      alignSelf: 'flex-start',
+    },
+    filterText: { fontSize: 14, color: c.primary, fontWeight: '600' },
+    list: { padding: spacing.md, paddingTop: 0, paddingBottom: 32 },
+    countryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+      marginBottom: 6,
+      marginTop: 12,
+    },
+    countryFlag: { fontSize: 28 },
+    countryInfo: { flex: 1 },
+    countryName: { fontSize: 15, fontWeight: '700', color: c.textPrimary },
+    countryMeta: { fontSize: 12, color: c.textTertiary },
+    riverCard: {
+      backgroundColor: c.cardBg,
+      borderRadius: radius.sm,
+      padding: 12,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    riverTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    riverName: { fontSize: 14, fontWeight: '700', color: c.textPrimary, flex: 1 },
+    diffBadge: {
+      backgroundColor: c.bg,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginLeft: 8,
+    },
+    diffText: { fontSize: 11, fontWeight: '600', color: c.textSecondary },
+    riverStats: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 4 },
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      backgroundColor: c.bg,
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    pillText: { fontSize: 12, color: c.textSecondary },
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    emptyText: { fontSize: 16, color: c.textTertiary },
+  });
+}
+
 export default function RiversScreen() {
   const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { days } = useApp();
   const sheetRef = useRef<BottomSheet>(null);
   const [filter, setFilter] = useState<FilterType>({ kind: 'all' });
@@ -83,24 +163,17 @@ export default function RiversScreen() {
           keyExtractor={(item, i) => `${item.name}-${item.country}-${i}`}
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
-          renderSectionHeader={({ section }) => (
-            <RiversSectionHeader section={section} />
-          )}
-          renderItem={({ item }) => <RiverRow river={item} />}
+          renderSectionHeader={({ section }) => <RiversSectionHeader section={section} styles={styles} />}
+          renderItem={({ item }) => <RiverRow river={item} styles={styles} colors={colors} />}
         />
       )}
 
-      <FilterSheet
-        days={days}
-        filter={filter}
-        onSelect={setFilter}
-        sheetRef={sheetRef}
-      />
+      <FilterSheet days={days} filter={filter} onSelect={setFilter} sheetRef={sheetRef} />
     </SafeAreaView>
   );
 }
 
-function RiversSectionHeader({ section }: { section: CountrySection }) {
+function RiversSectionHeader({ section, styles }: { section: CountrySection; styles: ReturnType<typeof makeStyles> }) {
   const { t } = useTranslation();
   return (
     <View style={styles.countryHeader}>
@@ -115,7 +188,7 @@ function RiversSectionHeader({ section }: { section: CountrySection }) {
   );
 }
 
-function RiverRow({ river }: { river: RiverStat }) {
+function RiverRow({ river, styles, colors }: { river: RiverStat; styles: ReturnType<typeof makeStyles>; colors: Colors }) {
   const { t } = useTranslation();
   return (
     <View style={styles.riverCard}>
@@ -125,21 +198,17 @@ function RiverRow({ river }: { river: RiverStat }) {
           <Text style={styles.diffText}>{t('rivers.class', { level: river.difficulty })}</Text>
         </View>
       </View>
-      {river.avgRating > 0 && (
-        <View style={{ marginBottom: 6 }}>
-          <StarsDisplay value={Math.round(river.avgRating)} />
-        </View>
-      )}
+      {river.avgRating > 0 && <View style={{ marginBottom: 6 }}><StarsDisplay value={Math.round(river.avgRating)} /></View>}
       <View style={styles.riverStats}>
-        <StatPill icon="speedometer-outline" label={`${river.km} km`} />
-        <StatPill icon="repeat-outline" label={`${river.laps} lap${river.laps !== 1 ? 's' : ''}`} />
-        <StatPill icon="time-outline" label={formatTime(river.timeMinutes)} />
+        <StatPill icon="speedometer-outline" label={`${river.km} km`} styles={styles} colors={colors} />
+        <StatPill icon="repeat-outline" label={`${river.laps} lap${river.laps !== 1 ? 's' : ''}`} styles={styles} colors={colors} />
+        <StatPill icon="time-outline" label={formatTime(river.timeMinutes)} styles={styles} colors={colors} />
       </View>
     </View>
   );
 }
 
-function StatPill({ icon, label }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string }) {
+function StatPill({ icon, label, styles, colors }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; styles: ReturnType<typeof makeStyles>; colors: Colors }) {
   return (
     <View style={styles.pill}>
       <Ionicons name={icon} size={12} color={colors.textSecondary} />
@@ -147,89 +216,3 @@ function StatPill({ icon, label }: { icon: React.ComponentProps<typeof Ionicons>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  title: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
-  filterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.cardBg,
-    borderRadius: radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignSelf: 'flex-start',
-  },
-  filterText: { fontSize: 14, color: colors.primary, fontWeight: '600' },
-  list: { padding: spacing.md, paddingTop: 0, paddingBottom: 32 },
-  countryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: 6,
-    marginTop: 12,
-  },
-  countryFlag: { fontSize: 28 },
-  countryInfo: { flex: 1 },
-  countryName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  countryMeta: { fontSize: 12, color: colors.textTertiary },
-  riverCard: {
-    backgroundColor: colors.cardBg,
-    borderRadius: radius.sm,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  riverTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  riverName: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, flex: 1 },
-  diffBadge: {
-    backgroundColor: colors.bg,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginLeft: 8,
-  },
-  diffText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
-  riverStats: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 4 },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: colors.bg,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  pillText: { fontSize: 12, color: colors.textSecondary },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  emptyText: { fontSize: 16, color: colors.textTertiary },
-});
