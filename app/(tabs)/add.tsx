@@ -21,6 +21,9 @@ import MapPicker from '../../components/MapPicker';
 
 const DIFFICULTIES: Difficulty[] = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 const SECTION_PRESETS = ['Alto', 'Medio', 'Bajo', 'Todo'];
+const SECTION_I18N: Record<string, string> = {
+  Alto: 'add.sectionAlto', Medio: 'add.sectionMedio', Bajo: 'add.sectionBajo', Todo: 'add.sectionTodo',
+};
 
 function isPresetActive(section: string | undefined, preset: string): boolean {
   if (!section) return false;
@@ -373,7 +376,9 @@ export default function AddScreen() {
                       style={[styles.sectionBtn, isPresetActive(lap.section, s) && styles.sectionBtnActive]}
                       onPress={() => updateLap(ri, li, { section: togglePreset(lap.section ?? '', s) })}
                     >
-                      <Text style={[styles.sectionBtnText, isPresetActive(lap.section, s) && styles.sectionBtnTextActive]}>{s}</Text>
+                      <Text style={[styles.sectionBtnText, isPresetActive(lap.section, s) && styles.sectionBtnTextActive]}>
+                        {t(SECTION_I18N[s] as any)}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
