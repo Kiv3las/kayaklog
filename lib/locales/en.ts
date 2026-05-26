@@ -74,6 +74,11 @@ const en: Translations = {
     removeRiver: 'Remove river',
     removeLap: 'Remove lap',
     duplicateLap: 'Duplicate lap',
+    section: 'Section',
+    sectionAlto: 'Upper',
+    sectionMedio: 'Middle',
+    sectionBajo: 'Lower',
+    sectionTodo: 'Full',
   },
   log: {
     title: 'Log',

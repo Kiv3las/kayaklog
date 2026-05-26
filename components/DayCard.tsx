@@ -69,6 +69,15 @@ function makeStyles(c: Colors) {
       borderColor: c.border,
     },
     diffText: { fontSize: 11, fontWeight: '600', color: c.textSecondary },
+    sectionBadge: {
+      backgroundColor: `${c.primary}18`,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: `${c.primary}40`,
+    },
+    sectionText: { fontSize: 11, fontWeight: '600', color: c.primary },
     lapRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -114,6 +123,11 @@ export default function DayCard({ day, onEdit, onDelete }: Props) {
             <View style={styles.riverHeader}>
               <Text style={styles.flag}>{country?.flag ?? '🏳️'}</Text>
               <Text style={styles.riverName}>{river.name}</Text>
+              {river.section && river.section !== 'todo' && (
+                <View style={styles.sectionBadge}>
+                  <Text style={styles.sectionText}>{t(`add.section${river.section.charAt(0).toUpperCase() + river.section.slice(1)}` as any)}</Text>
+                </View>
+              )}
               <View style={styles.diffBadge}>
                 <Text style={styles.diffText}>{t('dayCard.class', { level: river.difficulty })}</Text>
               </View>

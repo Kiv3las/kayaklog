@@ -72,6 +72,11 @@ const es = {
     removeRiver: 'Eliminar río',
     removeLap: 'Eliminar lap',
     duplicateLap: 'Duplicar lap',
+    section: 'Sección',
+    sectionAlto: 'Alto',
+    sectionMedio: 'Medio',
+    sectionBajo: 'Bajo',
+    sectionTodo: 'Todo',
   },
   log: {
     title: 'Registro',

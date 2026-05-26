@@ -128,6 +128,7 @@ export interface RiverStat {
   name: string;
   country: string;
   difficulty: string;
+  section?: string;
   km: number;
   laps: number;
   timeMinutes: number;
@@ -139,7 +140,7 @@ export function aggregateRivers(days: Day[]): RiverStat[] {
 
   for (const day of days) {
     for (const river of day.rivers) {
-      const key = `${river.name}||${river.country}`;
+      const key = `${river.name}||${river.country}||${river.section ?? 'todo'}`;
       const existing = map.get(key);
       let km = 0, timeMin = 0, laps = 0, stars = 0, ratedLaps = 0;
       for (const lap of river.laps) {
@@ -160,6 +161,7 @@ export function aggregateRivers(days: Day[]): RiverStat[] {
           name: river.name,
           country: river.country,
           difficulty: river.difficulty,
+          section: river.section,
           km: Math.round(km * 10) / 10,
           laps,
           timeMinutes: timeMin,

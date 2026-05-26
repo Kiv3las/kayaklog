@@ -10,7 +10,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useApp } from '../../lib/AppContext';
 import { useTheme } from '../../lib/themeContext';
 import type { Colors } from '../../constants/theme';
-import { Day, River, Lap, Difficulty, LatLng } from '../../lib/types';
+import { Day, River, Lap, Difficulty, LatLng, RiverSection } from '../../lib/types';
 import { todayISO, isoFromDate, parseDateISO, formatDisplayDate } from '../../lib/dates';
 import { spacing, radius } from '../../constants/theme';
 import { refreshNotificationSchedule } from '../../lib/notifications';
@@ -23,7 +23,7 @@ import GearButton from '../../components/GearButton';
 const DIFFICULTIES: Difficulty[] = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
 function emptyLap(): Lap { return { km: 0, hours: 0, minutes: 0, stars: 0, note: '' }; }
-function emptyRiver(): River { return { name: '', country: 'CL', difficulty: 'III', laps: [emptyLap()] }; }
+function emptyRiver(): River { return { name: '', country: 'CL', difficulty: 'III', section: 'todo', laps: [emptyLap()] }; }
 
 function makeStyles(c: Colors) {
   return StyleSheet.create({
@@ -98,6 +98,19 @@ function makeStyles(c: Colors) {
     diffBtnActive: { borderColor: c.primary, backgroundColor: c.primary },
     diffBtnText: { fontSize: 14, fontWeight: '700', color: c.textSecondary },
     diffBtnTextActive: { color: '#fff' },
+    sectionRow: { flexDirection: 'row', gap: 6 },
+    sectionBtn: {
+      flex: 1,
+      paddingVertical: 8,
+      alignItems: 'center',
+      borderRadius: radius.sm,
+      borderWidth: 1.5,
+      borderColor: c.border,
+      backgroundColor: c.cardBg,
+    },
+    sectionBtnActive: { borderColor: c.primary, backgroundColor: `${c.primary}18` },
+    sectionBtnText: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    sectionBtnTextActive: { color: c.primary },
     riverCard: {
       backgroundColor: c.cardBg,
       borderRadius: radius.md,
@@ -302,6 +315,21 @@ export default function AddScreen() {
               days={days}
               placeholder={t('add.riverNamePlaceholder')}
             />
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.section')}</Text>
+            <View style={styles.sectionRow}>
+              {(['alto', 'medio', 'bajo', 'todo'] as RiverSection[]).map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.sectionBtn, (river.section ?? 'todo') === s && styles.sectionBtnActive]}
+                  onPress={() => updateRiver(ri, { section: s })}
+                >
+                  <Text style={[styles.sectionBtnText, (river.section ?? 'todo') === s && styles.sectionBtnTextActive]}>
+                    {t(`add.section${s.charAt(0).toUpperCase() + s.slice(1)}` as any)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.country')}</Text>
             <CountryPicker value={river.country} onChange={(country) => updateRiver(ri, { country })} />
