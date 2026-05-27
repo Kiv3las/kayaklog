@@ -53,8 +53,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsSyncing(true);
     try {
       const [remoteDays, remoteSettings] = await Promise.all([
-        fetchDaysFromSupabase(),
-        fetchSettings(),
+        fetchDaysFromSupabase(userId),
+        fetchSettings(userId),
       ]);
 
       // If remote has data → use it; if empty and local has seed → push seed up

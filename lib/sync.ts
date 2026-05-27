@@ -1,10 +1,11 @@
 import { supabase } from './supabase';
 import { Day, Settings } from './types';
 
-export async function fetchDaysFromSupabase(): Promise<Day[]> {
+export async function fetchDaysFromSupabase(userId: string): Promise<Day[]> {
   const { data, error } = await supabase
     .from('days')
     .select('id, date, notes, rivers')
+    .eq('user_id', userId)
     .order('date', { ascending: false });
   if (error) throw error;
   return (data ?? []) as Day[];
@@ -27,10 +28,11 @@ export async function deleteDay(id: number): Promise<void> {
   if (error) console.warn('[sync] deleteDay:', error.message);
 }
 
-export async function fetchSettings(): Promise<Settings | null> {
+export async function fetchSettings(userId: string): Promise<Settings | null> {
   const { data, error } = await supabase
     .from('settings')
     .select('notif_enabled, notif_time')
+    .eq('user_id', userId)
     .maybeSingle();
   if (error || !data) return null;
   return { notifEnabled: data.notif_enabled, notifTime: data.notif_time };
