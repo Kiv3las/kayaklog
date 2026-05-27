@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, TextInput, Platform,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -223,6 +223,18 @@ export default function AddScreen() {
   const [mapPicker, setMapPicker] = useState<{ ri: number; li: number } | null>(null);
   const [notes, setNotes] = useState(existingDay?.notes ?? '');
   const [rivers, setRivers] = useState<River[]>(existingDay?.rivers ?? [emptyRiver()]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!editId) {
+        setDate(new Date());
+        setNotes('');
+        setRivers([emptyRiver()]);
+        setMapPicker(null);
+        setShowDatePicker(false);
+      }
+    }, [editId])
+  );
 
   const today = new Date();
 
