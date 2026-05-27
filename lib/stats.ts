@@ -98,8 +98,8 @@ export function monthBarData(days: Day[], year: number, month: number): BarDataI
   return result;
 }
 
-export function yearBarData(days: Day[], year: number): BarDataItem[] {
-  return Array.from({ length: 12 }, (_, i) => {
+export function yearBarData(days: Day[], year: number, upToMonth = 12): BarDataItem[] {
+  return Array.from({ length: upToMonth }, (_, i) => {
     const prefix = `${year}-${String(i + 1).padStart(2, '0')}`;
     const monthDays = days.filter((d) => d.date.startsWith(prefix));
     let km = 0;

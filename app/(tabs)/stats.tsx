@@ -139,7 +139,9 @@ export default function StatsScreen() {
     const { type, date } = period;
     if (type === 'week') return weekBarData(days, mondayOf(date));
     if (type === 'month') return monthBarData(days, getYear(date), getMonth(date) + 1);
-    return yearBarData(days, getYear(date));
+    const now = new Date();
+    const upToMonth = getYear(date) === getYear(now) ? getMonth(now) + 1 : 12;
+    return yearBarData(days, getYear(date), upToMonth);
   }, [days, period]);
 
   const chartData = barData.map((item) => ({
