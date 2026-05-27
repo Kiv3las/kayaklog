@@ -1,0 +1,48 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3eb1ff"/>
+      <stop offset="100%" stop-color="#0a5dd1"/>
+    </linearGradient>
+    <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e6f1ff"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Water ripples behind the kayak -->
+  <g opacity="0.22" stroke="#ffffff" stroke-width="9" fill="none" stroke-linecap="round">
+    <path d="M 140 800 Q 340 760, 540 800 T 880 800"/>
+    <path d="M 180 880 Q 370 840, 560 880 T 880 880"/>
+  </g>
+
+  <!-- Kayak (top-down), tilted -20° for energy -->
+  <g transform="translate(512 512) rotate(-20)">
+    <!-- Hull: long, narrow, pointed at both ends -->
+    <path d="
+      M 0 -420
+      C 70 -420 120 -300 130 -150
+      C 135 -50 135 50 130 150
+      C 120 300 70 420 0 420
+      C -70 420 -120 300 -130 150
+      C -135 50 -135 -50 -130 -150
+      C -120 -300 -70 -420 0 -420 Z
+    " fill="url(#hull)" stroke="#0a5dd1" stroke-width="4" stroke-opacity="0.25"/>
+
+    <!-- Cockpit (large, occupies ~35% of hull length) -->
+    <ellipse cx="0" cy="0" rx="80" ry="160" fill="#0a5dd1"/>
+    <ellipse cx="0" cy="0" rx="80" ry="160" fill="none" stroke="#ffffff" stroke-width="6"/>
+
+    <!-- Center seat detail (subtle) -->
+    <ellipse cx="0" cy="20" rx="40" ry="70" fill="#3eb1ff" opacity="0.45"/>
+
+    <!-- Paddle: diagonal across kayak -->
+    <g transform="rotate(70)">
+      <rect x="-380" y="-12" width="760" height="24" rx="12" fill="#ffffff" opacity="0.9"/>
+      <ellipse cx="-380" cy="0" rx="55" ry="32" fill="#ffffff" opacity="0.9"/>
+      <ellipse cx="380" cy="0" rx="55" ry="32" fill="#ffffff" opacity="0.9"/>
+    </g>
+  </g>
+</svg>

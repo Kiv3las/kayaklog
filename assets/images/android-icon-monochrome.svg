@@ -1,0 +1,27 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Monochrome variant: solid white silhouette on transparent.
+       Android 13+ tints this for the "themed icons" feature. -->
+  <g transform="translate(512 512) scale(0.7) rotate(-20)" fill="#ffffff">
+    <!-- Hull with cockpit cutout (even-odd fill rule creates the hole) -->
+    <path fill-rule="evenodd" d="
+      M 0 -420
+      C 70 -420 120 -300 130 -150
+      C 135 -50 135 50 130 150
+      C 120 300 70 420 0 420
+      C -70 420 -120 300 -130 150
+      C -135 50 -135 -50 -130 -150
+      C -120 -300 -70 -420 0 -420 Z
+      M 0 -160
+      C 50 -160 80 -100 80 0
+      C 80 100 50 160 0 160
+      C -50 160 -80 100 -80 0
+      C -80 -100 -50 -160 0 -160 Z
+    "/>
+    <!-- Paddle -->
+    <g transform="rotate(70)">
+      <rect x="-380" y="-12" width="760" height="24" rx="12"/>
+      <ellipse cx="-380" cy="0" rx="55" ry="32"/>
+      <ellipse cx="380" cy="0" rx="55" ry="32"/>
+    </g>
+  </g>
+</svg>

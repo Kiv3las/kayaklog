@@ -150,6 +150,15 @@ export default function StatsScreen() {
     frontColor: colors.primary,
   }));
 
+  // gifted-charts retains animation state across data prop changes; a stable
+  // key per period forces a remount so the bars actually re-render.
+  const chartKey =
+    period.type === 'week'
+      ? `w-${isoFromDate(mondayOf(period.date))}`
+      : period.type === 'month'
+        ? `m-${getYear(period.date)}-${getMonth(period.date) + 1}`
+        : `y-${getYear(period.date)}`;
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -209,6 +218,7 @@ export default function StatsScreen() {
             <Text style={styles.noData}>{t('stats.noData')}</Text>
           ) : (
             <BarChart
+              key={chartKey}
               data={chartData}
               barWidth={period.type === 'year' ? 20 : 30}
               spacing={period.type === 'year' ? 6 : 14}

@@ -1,0 +1,14 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3eb1ff"/>
+      <stop offset="100%" stop-color="#0a5dd1"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <!-- Subtle water ripples to add depth -->
+  <g opacity="0.18" stroke="#ffffff" stroke-width="9" fill="none" stroke-linecap="round">
+    <path d="M 140 760 Q 340 720, 540 760 T 880 760"/>
+    <path d="M 180 860 Q 370 820, 560 860 T 880 860"/>
+  </g>
+</svg>

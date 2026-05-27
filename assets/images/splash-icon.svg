@@ -1,0 +1,18 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Splash: white kayak silhouette on transparent. -->
+  <!-- The expo-splash-screen plugin renders this centered on the configured backgroundColor. -->
+  <g transform="translate(512 512)">
+    <path d="
+      M 0 -420
+      C 70 -420 120 -300 130 -150
+      C 135 -50 135 50 130 150
+      C 120 300 70 420 0 420
+      C -70 420 -120 300 -130 150
+      C -135 50 -135 -50 -130 -150
+      C -120 -300 -70 -420 0 -420 Z
+    " fill="#ffffff"/>
+    <ellipse cx="0" cy="0" rx="80" ry="160" fill="#0a5dd1"/>
+    <ellipse cx="0" cy="0" rx="80" ry="160" fill="none" stroke="#ffffff" stroke-width="6"/>
+    <ellipse cx="0" cy="20" rx="40" ry="70" fill="#3eb1ff" opacity="0.45"/>
+  </g>
+</svg>

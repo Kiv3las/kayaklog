@@ -79,12 +79,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    let mounted = true;
+
+    // Listen for auth state changes (SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED,
+    // INITIAL_SESSION). supabase-js v2 fires INITIAL_SESSION on subscribe
+    // with the cached session, so this also handles app bootstrap.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (currentUser) {
         await loadUserData(currentUser.id);
+        if (event === 'INITIAL_SESSION') {
+          // Validate the cached JWT against the server in the background.
+          // Only sign out on definitive auth rejection (401/403). Network
+          // errors are ignored so the user stays signed in offline.
+          supabase.auth.getUser().then(({ error }) => {
+            if (!mounted) return;
+            if (error?.status === 401 || error?.status === 403) {
+              supabase.auth.signOut();
+            }
+          });
+        }
       } else {
         setDays([]);
         setSettings({ notifEnabled: false, notifTime: '21:00' });
@@ -92,25 +108,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Check existing session on mount — validate server-side; tolerate offline
-    supabase.auth.getUser().then(async ({ data, error }) => {
-      let currentUser = data.user;
-      if (error && !data.user) {
-        if (error.status !== 401 && error.status !== 403) {
-          // Network error — fall back to cached session so app works offline
-          const { data: { session } } = await supabase.auth.getSession();
-          currentUser = session?.user ?? null;
-        }
-      }
-      setUser(currentUser ?? null);
-      if (currentUser) {
-        await loadUserData(currentUser.id);
-      } else {
-        setIsLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, [loadUserData]);
 
   const addDay = useCallback(async (day: Day) => {
@@ -143,7 +141,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       void refreshNotificationSchedule(settings, next);
       return next;
     });
-    if (user) void remoteDeleteDay(id);
+    if (user) void remoteDeleteDay(id, user.id);
   }, [user, settings]);
 
   const updateSettings = useCallback(async (newSettings: Settings) => {

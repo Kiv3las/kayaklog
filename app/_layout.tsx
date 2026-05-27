@@ -39,20 +39,30 @@ function RootContent() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      const s = data.session;
-      if (s) {
-        const { error } = await supabase.auth.getUser();
-        if (error?.status === 401 || error?.status === 403) {
-          await supabase.auth.signOut();
-          setSession(null);
-          return;
-        }
+    let mounted = true;
+
+    // Resolve the splash state from the locally cached session — never block
+    // on the network so the app opens immediately when offline.
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setSession(data.session ?? null);
+      // Validate the cached JWT against the server in the background. Sign
+      // out only if the server explicitly rejects it (401/403). Network
+      // errors leave the session intact — offline use keeps the user signed in.
+      if (data.session) {
+        supabase.auth.getUser().then(({ error }) => {
+          if (!mounted) return;
+          if (error?.status === 401 || error?.status === 403) {
+            supabase.auth.signOut();
+          }
+        });
       }
-      setSession(s ?? null);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSession(s));
-    return () => subscription.unsubscribe();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
+      if (mounted) setSession(s);
+    });
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
   if (session === undefined || !i18nReady) {

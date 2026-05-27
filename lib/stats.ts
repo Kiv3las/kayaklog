@@ -1,6 +1,7 @@
 import { Day, Lap, River } from './types';
 import { isoFromDate, mondayOf, addDaysToISO, monthName } from './dates';
 import { addDays, addWeeks, addMonths, addYears, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfYear } from 'date-fns';
+import i18n from './i18n';
 
 export interface PeriodStats {
   km: number;
@@ -58,7 +59,7 @@ export interface BarDataItem {
 }
 
 export function weekBarData(days: Day[], monday: Date): BarDataItem[] {
-  const labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  const labels = i18n.t('days.short', { returnObjects: true }) as string[];
   return labels.map((label, i) => {
     const iso = isoFromDate(addDays(monday, i));
     const dayData = days.filter((d) => d.date === iso);
@@ -99,17 +100,20 @@ export function monthBarData(days: Day[], year: number, month: number): BarDataI
 }
 
 export function yearBarData(days: Day[], year: number, upToMonth = 12): BarDataItem[] {
-  return Array.from({ length: upToMonth }, (_, i) => {
+  const buckets = Array.from({ length: upToMonth }, (_, i) => {
     const prefix = `${year}-${String(i + 1).padStart(2, '0')}`;
-    const monthDays = days.filter((d) => d.date.startsWith(prefix));
     let km = 0;
-    for (const day of monthDays) {
+    for (const day of days) {
+      if (!day.date.startsWith(prefix)) continue;
       for (const river of day.rivers) {
         for (const lap of river.laps) km += lap.km;
       }
     }
-    return { label: monthName(i + 1), value: Math.round(km * 10) / 10 };
+    return { month: i + 1, km: Math.round(km * 10) / 10 };
   });
+  const firstWithData = buckets.findIndex((b) => b.km > 0);
+  const visible = firstWithData === -1 ? buckets : buckets.slice(firstWithData);
+  return visible.map((b) => ({ label: monthName(b.month), value: b.km }));
 }
 
 export function statsForDays(days: Day[]): PeriodStats {
@@ -136,44 +140,56 @@ export interface RiverStat {
 }
 
 export function aggregateRivers(days: Day[]): RiverStat[] {
-  const map = new Map<string, RiverStat>();
+  interface Accum {
+    name: string;
+    country: string;
+    difficulty: string;
+    sections: Set<string>;
+    km: number;
+    laps: number;
+    timeMinutes: number;
+    totalStars: number;
+    ratedLaps: number;
+  }
+  const map = new Map<string, Accum>();
 
   for (const day of days) {
     for (const river of day.rivers) {
       const key = `${river.name}||${river.country}`;
-      const existing = map.get(key);
-      let km = 0, timeMin = 0, laps = 0, stars = 0, ratedLaps = 0;
-      for (const lap of river.laps) {
-        km += lap.km;
-        timeMin += lap.hours * 60 + lap.minutes;
-        laps++;
-        if (lap.stars > 0) { stars += lap.stars; ratedLaps++; }
-      }
-      const newSections = river.laps.map(l => l.section).filter((s): s is string => !!s && s !== '' && s !== 'todo');
-      if (existing) {
-        existing.km += km;
-        existing.timeMinutes += timeMin;
-        existing.laps += laps;
-        existing.avgRating = ratedLaps > 0
-          ? (existing.avgRating * existing.laps + stars) / (existing.laps + ratedLaps)
-          : existing.avgRating;
-        for (const s of newSections) {
-          if (!existing.sections.includes(s)) existing.sections.push(s);
-        }
-      } else {
-        map.set(key, {
+      let acc = map.get(key);
+      if (!acc) {
+        acc = {
           name: river.name,
           country: river.country,
           difficulty: river.laps[0]?.difficulty ?? 'III',
-          sections: [...new Set(newSections)],
-          km: Math.round(km * 10) / 10,
-          laps,
-          timeMinutes: timeMin,
-          avgRating: ratedLaps > 0 ? Math.round((stars / ratedLaps) * 10) / 10 : 0,
-        });
+          sections: new Set<string>(),
+          km: 0, laps: 0, timeMinutes: 0,
+          totalStars: 0, ratedLaps: 0,
+        };
+        map.set(key, acc);
+      }
+      for (const lap of river.laps) {
+        acc.km += lap.km;
+        acc.timeMinutes += lap.hours * 60 + lap.minutes;
+        acc.laps++;
+        if (lap.stars > 0) { acc.totalStars += lap.stars; acc.ratedLaps++; }
+        if (lap.section && lap.section !== '' && lap.section !== 'todo') {
+          acc.sections.add(lap.section);
+        }
       }
     }
   }
 
-  return Array.from(map.values()).sort((a, b) => b.km - a.km);
+  return Array.from(map.values())
+    .map((a) => ({
+      name: a.name,
+      country: a.country,
+      difficulty: a.difficulty,
+      sections: Array.from(a.sections),
+      km: Math.round(a.km * 10) / 10,
+      laps: a.laps,
+      timeMinutes: a.timeMinutes,
+      avgRating: a.ratedLaps > 0 ? Math.round((a.totalStars / a.ratedLaps) * 10) / 10 : 0,
+    }))
+    .sort((a, b) => b.km - a.km);
 }

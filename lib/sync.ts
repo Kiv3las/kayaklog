@@ -20,12 +20,12 @@ export async function upsertDay(day: Day, userId: string): Promise<void> {
     rivers: day.rivers,
     updated_at: new Date().toISOString(),
   });
-  if (error) console.warn('[sync] upsertDay:', error.message);
+  if (__DEV__ && error) console.warn('[sync] upsertDay:', error.message);
 }
 
-export async function deleteDay(id: number): Promise<void> {
-  const { error } = await supabase.from('days').delete().eq('id', id);
-  if (error) console.warn('[sync] deleteDay:', error.message);
+export async function deleteDay(id: number, userId: string): Promise<void> {
+  const { error } = await supabase.from('days').delete().eq('id', id).eq('user_id', userId);
+  if (__DEV__ && error) console.warn('[sync] deleteDay:', error.message);
 }
 
 export async function fetchSettings(userId: string): Promise<Settings | null> {
@@ -45,7 +45,7 @@ export async function upsertSettings(settings: Settings, userId: string): Promis
     notif_time: settings.notifTime,
     updated_at: new Date().toISOString(),
   });
-  if (error) console.warn('[sync] upsertSettings:', error.message);
+  if (__DEV__ && error) console.warn('[sync] upsertSettings:', error.message);
 }
 
 export async function pushAllDays(days: Day[], userId: string): Promise<void> {
@@ -59,5 +59,5 @@ export async function pushAllDays(days: Day[], userId: string): Promise<void> {
     updated_at: new Date().toISOString(),
   }));
   const { error } = await supabase.from('days').upsert(rows);
-  if (error) console.warn('[sync] pushAllDays:', error.message);
+  if (__DEV__ && error) console.warn('[sync] pushAllDays:', error.message);
 }

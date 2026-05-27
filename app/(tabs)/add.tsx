@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, TextInput, Platform,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -50,6 +50,13 @@ function emptyLap(): Lap {
 }
 function emptyRiver(): River {
   return { name: '', country: 'CL', laps: [emptyLap()] };
+}
+
+// Client-minted bigint ID for local-first offline writes. Date.now() alone
+// collides across devices writing in the same millisecond — RLS silently
+// drops the second write. The 3 random low digits drop that to ~1-in-1000.
+function newDayId(): number {
+  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
 }
 
 function makeStyles(c: Colors) {
@@ -224,17 +231,30 @@ export default function AddScreen() {
   const [notes, setNotes] = useState(existingDay?.notes ?? '');
   const [rivers, setRivers] = useState<River[]>(existingDay?.rivers ?? [emptyRiver()]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!editId) {
-        setDate(new Date());
-        setNotes('');
-        setRivers([emptyRiver()]);
-        setMapPicker(null);
-        setShowDatePicker(false);
+  // The (tabs)/add screen stays mounted across navigations, so the useState
+  // initializers above only run on first mount. Re-sync the form whenever
+  // editId changes — load the day's data for edits, clear for new entries.
+  // Guard with a ref so in-progress edits aren't wiped by background syncs
+  // that mutate `days` (which would otherwise re-run this on every refresh).
+  const lastSyncedEditIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (editId === lastSyncedEditIdRef.current) return;
+    lastSyncedEditIdRef.current = editId;
+    if (editId) {
+      const day = days.find((d) => d.id === Number(editId));
+      if (day) {
+        setDate(parseDateISO(day.date));
+        setNotes(day.notes);
+        setRivers(day.rivers);
       }
-    }, [editId])
-  );
+    } else {
+      setDate(new Date());
+      setNotes('');
+      setRivers([emptyRiver()]);
+    }
+    setMapPicker(null);
+    setShowDatePicker(false);
+  }, [editId, days]);
 
   const today = new Date();
 
@@ -283,7 +303,7 @@ export default function AddScreen() {
 
   async function handleSave() {
     if (!canSave) return;
-    const dayData: Day = { id: existingDay?.id ?? Date.now(), date: isoFromDate(date), notes, rivers };
+    const dayData: Day = { id: existingDay?.id ?? newDayId(), date: isoFromDate(date), notes, rivers };
     if (isEdit) await updateDay(dayData);
     else await addDay(dayData);
     await refreshNotificationSchedule(settings, [...days, dayData]);

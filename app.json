@@ -6,12 +6,14 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "kayaklog",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.tunombre.kayaklog",
+      "bundleIdentifier": "cl.ivelic.kayaklog",
+      "buildNumber": "1",
       "infoPlist": {
-        "UIBackgroundModes": []
+        "UIBackgroundModes": [],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -22,7 +24,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.tunombre.kayaklog"
+      "package": "cl.ivelic.kayaklog",
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro",
@@ -36,7 +39,11 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#0a5dd1",
+          "dark": {
+            "image": "./assets/images/splash-icon.png",
+            "backgroundColor": "#001a3d"
+          }
         }
       ],
       [
@@ -44,6 +51,12 @@
         {
           "color": "#0a84ff",
           "sounds": []
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "KayakLog uses your location to center the map when marking put-in and take-out points for your kayak trips."
         }
       ],
       "expo-asset",
