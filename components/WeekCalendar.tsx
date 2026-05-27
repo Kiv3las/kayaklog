@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { addDays, format } from 'date-fns';
 import { isoFromDate, todayISO } from '../lib/dates';
+import { useTheme } from '../lib/themeContext';
+import type { Colors } from '../constants/theme';
 
 interface Props {
   monday: Date;
@@ -11,7 +13,20 @@ interface Props {
 
 const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
+function makeNeutralStyles(c: Colors) {
+  return {
+    bubble: { backgroundColor: `${c.textTertiary}22` },
+    todayRing: { borderWidth: 2, borderColor: c.primary },
+    activeBubble: { backgroundColor: '#ff9500' },
+    activeDayNum: { color: '#ffffff' },
+    inactiveDayNum: { color: c.textSecondary },
+    label: { color: c.textTertiary },
+  };
+}
+
 export default function WeekCalendar({ monday, activeDates, flame = true }: Props) {
+  const { colors } = useTheme();
+  const neutral = useMemo(() => makeNeutralStyles(colors), [colors]);
   const today = todayISO();
 
   return (
@@ -22,24 +37,20 @@ export default function WeekCalendar({ monday, activeDates, flame = true }: Prop
         const isActive = activeDates.has(iso);
         const isToday = iso === today;
 
+        const bubbleStyle = flame
+          ? [styles.bubble, styles.bubbleFlame, isToday && styles.todayRingFlame, isActive && styles.activeBubbleFlame]
+          : [styles.bubble, neutral.bubble, isToday && neutral.todayRing, isActive && neutral.activeBubble];
+
+        const numStyle = flame
+          ? [styles.dayNum, isActive ? styles.activeDayNumFlame : styles.inactiveDayNumFlame]
+          : [styles.dayNum, isActive ? neutral.activeDayNum : neutral.inactiveDayNum];
+
         return (
           <View key={i} style={styles.col}>
-            <View style={[
-              styles.bubble,
-              flame ? styles.bubbleFlame : styles.bubbleNeutral,
-              isToday && (flame ? styles.todayRingFlame : styles.todayRingNeutral),
-              isActive && (flame ? styles.activeBubbleFlame : styles.activeBubbleNeutral),
-            ]}>
-              <Text style={[
-                styles.dayNum,
-                isActive
-                  ? (flame ? styles.activeDayNumFlame : styles.activeDayNumNeutral)
-                  : (flame ? styles.inactiveDayNumFlame : styles.inactiveDayNumNeutral),
-              ]}>
-                {format(date, 'd')}
-              </Text>
+            <View style={bubbleStyle as any}>
+              <Text style={numStyle as any}>{format(date, 'd')}</Text>
             </View>
-            <Text style={flame ? styles.labelFlame : styles.labelNeutral}>{label}</Text>
+            <Text style={[styles.labelBase, flame ? styles.labelFlame : neutral.label]}>{label}</Text>
           </View>
         );
       })}
@@ -68,22 +79,12 @@ const styles = StyleSheet.create({
   bubbleFlame: {
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  bubbleNeutral: {
-    backgroundColor: 'rgba(0,0,0,0.05)',
-  },
   todayRingFlame: {
     borderWidth: 2,
     borderColor: '#ffffff',
   },
-  todayRingNeutral: {
-    borderWidth: 2,
-    borderColor: '#0a84ff',
-  },
   activeBubbleFlame: {
     backgroundColor: '#ffffff',
-  },
-  activeBubbleNeutral: {
-    backgroundColor: '#ff9500',
   },
   dayNum: {
     fontSize: 13,
@@ -92,23 +93,14 @@ const styles = StyleSheet.create({
   activeDayNumFlame: {
     color: '#ff9500',
   },
-  activeDayNumNeutral: {
-    color: '#ffffff',
-  },
   inactiveDayNumFlame: {
     color: 'rgba(255,255,255,0.7)',
   },
-  inactiveDayNumNeutral: {
-    color: '#666666',
+  labelBase: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   labelFlame: {
-    fontSize: 10,
     color: 'rgba(255,255,255,0.8)',
-    fontWeight: '600',
-  },
-  labelNeutral: {
-    fontSize: 10,
-    color: '#888888',
-    fontWeight: '600',
   },
 });

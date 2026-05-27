@@ -206,7 +206,7 @@ function makeStyles(c: Colors) {
 
 export default function AddScreen() {
   const { t } = useTranslation();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { days, addDay, updateDay, settings } = useApp();
   const router = useRouter();
@@ -322,6 +322,7 @@ export default function AddScreen() {
             <DateTimePicker
               value={date} mode="date" maximumDate={today}
               display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              themeVariant={isDark ? 'dark' : 'light'}
               onChange={(_, selected) => { setShowDatePicker(false); if (selected) setDate(selected); }}
             />
           )}
