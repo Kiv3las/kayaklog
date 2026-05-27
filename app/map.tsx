@@ -22,7 +22,7 @@ function nearCoord(a: { latitude: number; longitude: number }, b: { latitude: nu
   return Math.abs(a.latitude - b.latitude) < THRESHOLD && Math.abs(a.longitude - b.longitude) < THRESHOLD;
 }
 
-interface PinEntry { name: string; difficulty: string; date: string }
+interface PinEntry { name: string; difficulty: string; date: string; section?: string }
 interface Pin {
   id: string;
   coord: { latitude: number; longitude: number };
@@ -36,6 +36,7 @@ interface RouteItem {
   name: string;
   difficulty: string;
   date: string;
+  section?: string;
   start: { latitude: number; longitude: number };
   end?: { latitude: number; longitude: number };
   polyline: { latitude: number; longitude: number }[];
@@ -110,18 +111,18 @@ function makeStyles(c: Colors) {
 
 function makeCalloutStyles(c: Colors) {
   return StyleSheet.create({
-    container: { padding: 12, gap: 4 },
+    container: { padding: 12, gap: 4, backgroundColor: '#ffffff' },
     header: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
     typeDot: { width: 10, height: 10, borderRadius: 5 },
-    typeLabel: { fontSize: 13, fontWeight: '700', color: c.textPrimary },
+    typeLabel: { fontSize: 13, fontWeight: '700', color: '#1c1c1e' },
     badge: { marginLeft: 'auto', backgroundColor: c.primary, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 },
     badgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
     entry: { marginBottom: 2 },
-    riverName: { fontSize: 13, fontWeight: '600', color: c.textPrimary },
-    entryMeta: { fontSize: 11, color: c.textTertiary },
-    divider: { height: 1, backgroundColor: c.border, marginVertical: 8 },
-    coordLabel: { fontSize: 10, fontWeight: '700', color: c.textTertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
-    coordValue: { fontSize: 12, fontWeight: '600', color: c.textPrimary, marginBottom: 8 },
+    riverName: { fontSize: 13, fontWeight: '600', color: '#1c1c1e' },
+    entryMeta: { fontSize: 11, color: '#666666' },
+    divider: { height: 1, backgroundColor: '#e0e0e0', marginVertical: 8 },
+    coordLabel: { fontSize: 10, fontWeight: '700', color: '#888888', textTransform: 'uppercase', letterSpacing: 0.4 },
+    coordValue: { fontSize: 12, fontWeight: '600', color: '#1c1c1e', marginBottom: 8 },
     actions: { flexDirection: 'row', gap: 8 },
     actionBtn: {
       flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -157,7 +158,7 @@ export default function MapScreen() {
             : [];
           result.push({
             id: `${day.id}-${river.name}-${li}`,
-            name: river.name, difficulty: lap.difficulty ?? 'III', date: day.date,
+            name: river.name, difficulty: lap.difficulty ?? 'III', date: day.date, section: lap.section,
             start: { latitude: lap.startLocation.lat, longitude: lap.startLocation.lng },
             end: lap.endLocation ? { latitude: lap.endLocation.lat, longitude: lap.endLocation.lng } : undefined,
             polyline: poly,
@@ -173,18 +174,19 @@ export default function MapScreen() {
     const ends: Pin[] = [];
     for (const route of routes) {
       const existingStart = starts.find((p) => nearCoord(p.coord, route.start));
+      const entry: PinEntry = { name: route.name, difficulty: route.difficulty, date: route.date, section: route.section };
       if (existingStart) {
-        existingStart.entries.push({ name: route.name, difficulty: route.difficulty, date: route.date });
+        existingStart.entries.push(entry);
         if (route.polyline.length >= 2) existingStart.polylines.push(route.polyline);
       } else {
-        starts.push({ id: `start-${route.id}`, coord: route.start, type: 'start', entries: [{ name: route.name, difficulty: route.difficulty, date: route.date }], polylines: route.polyline.length >= 2 ? [route.polyline] : [] });
+        starts.push({ id: `start-${route.id}`, coord: route.start, type: 'start', entries: [entry], polylines: route.polyline.length >= 2 ? [route.polyline] : [] });
       }
       if (!route.end) continue;
       const existingEnd = ends.find((p) => nearCoord(p.coord, route.end!));
       if (existingEnd) {
-        existingEnd.entries.push({ name: route.name, difficulty: route.difficulty, date: route.date });
+        existingEnd.entries.push({ ...entry });
       } else {
-        ends.push({ id: `end-${route.id}`, coord: route.end, type: 'end', entries: [{ name: route.name, difficulty: route.difficulty, date: route.date }], polylines: [] });
+        ends.push({ id: `end-${route.id}`, coord: route.end, type: 'end', entries: [{ ...entry }], polylines: [] });
       }
     }
     return { startPins: starts, endPins: ends };
@@ -236,7 +238,7 @@ export default function MapScreen() {
           {startPins.map((pin) => (
             <Marker key={pin.id} coordinate={pin.coord} pinColor="#34c759">
               <Callout style={styles.callout}>
-                <PinCallout pin={pin} label={t('map.start')} dotColor="#34c759"
+                <PinCallout pin={pin} label={[t('map.putIn'), pin.entries[0]?.section].filter(Boolean).join(' ')} dotColor="#34c759"
                   onCopy={() => copyCoord(pin.coord)}
                   onShare={() => shareCoord(pin.coord, t('map.startLabel', { names: pin.entries.map(e => e.name).join(', ') }))} />
               </Callout>
@@ -245,7 +247,7 @@ export default function MapScreen() {
           {endPins.map((pin) => (
             <Marker key={pin.id} coordinate={pin.coord} pinColor="#ff3b30">
               <Callout style={styles.callout}>
-                <PinCallout pin={pin} label={t('map.end')} dotColor="#ff3b30"
+                <PinCallout pin={pin} label={[t('map.takeOut'), pin.entries[0]?.section].filter(Boolean).join(' ')} dotColor="#ff3b30"
                   onCopy={() => copyCoord(pin.coord)}
                   onShare={() => shareCoord(pin.coord, t('map.endLabel', { names: pin.entries.map(e => e.name).join(', ') }))} />
               </Callout>

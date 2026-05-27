@@ -149,6 +149,8 @@ const es = {
     all: 'Todo',
     start: 'Inicio',
     end: 'Final',
+    putIn: 'Put in',
+    takeOut: 'Take out',
     coordinates: 'Coordenadas',
     copy: 'Copiar',
     share: 'Compartir',

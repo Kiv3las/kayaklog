@@ -151,6 +151,8 @@ const en: Translations = {
     all: 'All',
     start: 'Start',
     end: 'End',
+    putIn: 'Put in',
+    takeOut: 'Take out',
     coordinates: 'Coordinates',
     copy: 'Copy',
     share: 'Share',
