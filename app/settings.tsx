@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Switch, TextInput,
   SafeAreaView, ScrollView, Platform, Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -11,7 +11,7 @@ import { useApp } from '../lib/AppContext';
 import { useTheme } from '../lib/themeContext';
 import type { AppearanceMode } from '../lib/themeContext';
 import type { Colors } from '../constants/theme';
-import { requestPermission, refreshNotificationSchedule } from '../lib/notifications';
+import { requestPermission, hasPermission, refreshNotificationSchedule } from '../lib/notifications';
 import { loadSavedLanguage, changeAppLanguage, type AppLanguage } from '../lib/i18n';
 import { spacing, radius } from '../constants/theme';
 import NotificationBanner from '../components/NotificationBanner';
@@ -138,14 +138,33 @@ export default function SettingsScreen() {
   useEffect(() => { loadSavedLanguage().then(setLanguage); }, []);
   useEffect(() => { setNameInput(displayName === 'paddler' ? '' : displayName); }, [displayName]);
 
+  // Whenever the user returns to Settings, reconcile the in-app notifEnabled
+  // flag with whatever iOS currently grants. If they disabled notifications
+  // from iOS Settings since the last visit, our toggle would otherwise still
+  // appear ON while no notifications actually fire.
+  useFocusEffect(
+    useCallback(() => {
+      if (!settings.notifEnabled) return;
+      hasPermission().then((granted) => {
+        if (!granted) updateSettings({ ...settings, notifEnabled: false });
+      });
+    }, [settings, updateSettings]),
+  );
+
   const nameDirty = nameInput.trim() !== (displayName === 'paddler' ? '' : displayName);
 
   async function handleSaveName() {
     const trimmed = nameInput.trim();
     if (!trimmed) return;
     setSavingName(true);
-    await updateName(trimmed);
-    setSavingName(false);
+    try {
+      const ok = await updateName(trimmed);
+      if (!ok) Alert.alert(t('settings.saveFailed'), t('settings.tryAgainLater'));
+    } catch {
+      Alert.alert(t('settings.saveFailed'), t('settings.tryAgainLater'));
+    } finally {
+      setSavingName(false);
+    }
   }
 
   const [h, m] = settings.notifTime.split(':').map(Number);

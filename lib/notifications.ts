@@ -18,6 +18,14 @@ export async function requestPermission(): Promise<boolean> {
   return status === 'granted';
 }
 
+// Returns the current notification permission state without prompting the
+// user. Used to detect when iOS has revoked permissions outside the app so
+// we can keep the in-app toggle in sync with reality.
+export async function hasPermission(): Promise<boolean> {
+  const { status } = await Notifications.getPermissionsAsync();
+  return status === 'granted';
+}
+
 export async function scheduleDaily(hour: number, minute: number): Promise<void> {
   await Notifications.scheduleNotificationAsync({
     content: {

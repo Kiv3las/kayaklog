@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { Day, Settings } from './types';
-import { loadDays, saveDays, loadSettings, saveSettings } from './storage';
+import { loadDays, saveDays, loadSettings, saveSettings, clearUserData } from './storage';
 import { refreshNotificationSchedule } from './notifications';
 import { supabase } from './supabase';
 import {
@@ -24,7 +24,7 @@ interface AppContextValue {
   updateDay: (day: Day) => Promise<void>;
   deleteDay: (id: number) => Promise<void>;
   updateSettings: (settings: Settings) => Promise<void>;
-  updateName: (name: string) => Promise<void>;
+  updateName: (name: string) => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
@@ -57,13 +57,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetchSettings(userId),
       ]);
 
-      // If remote has data → use it; if empty and local has seed → push seed up
+      // Merge instead of overwriting: any day in the local cache whose id is
+      // NOT in the remote set was added/edited while offline and never made
+      // it to the server. Overwriting would silently lose those rows. Keep
+      // them and push them up now that we're online again.
       if (remoteDays.length > 0) {
-        const sorted = [...remoteDays].sort((a, b) => b.date.localeCompare(a.date));
-        setDays(sorted);
-        await saveDays(sorted, userId);
+        const remoteIds = new Set(remoteDays.map((d) => d.id));
+        const pendingLocal = localDays.filter((d) => !remoteIds.has(d.id));
+        const merged = [...remoteDays, ...pendingLocal]
+          .sort((a, b) => b.date.localeCompare(a.date));
+        setDays(merged);
+        await saveDays(merged, userId);
+        if (pendingLocal.length > 0) {
+          await pushAllDays(pendingLocal, userId);
+        }
       } else if (localDays.length > 0) {
-        // First login: push local seed data to Supabase
+        // First login or empty remote: push the whole local cache up.
         await pushAllDays(localDays, userId);
       }
 
@@ -152,14 +161,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (user) void upsertSettings(newSettings, user.id);
   }, [user, days]);
 
-  const updateName = useCallback(async (name: string) => {
-    const { data } = await supabase.auth.updateUser({ data: { name } });
+  const updateName = useCallback(async (name: string): Promise<boolean> => {
+    const { data, error } = await supabase.auth.updateUser({ data: { name } });
+    if (error) return false;
     if (data.user) setUser(data.user);
+    return true;
   }, []);
 
   const signOut = useCallback(async () => {
+    // Capture the current user id before signOut wipes the session, so we
+    // can purge their local cache files. Without this, a logout on a shared
+    // device leaves the previous user's data sitting in AsyncStorage.
+    const previousUserId = user?.id;
     await supabase.auth.signOut();
-  }, []);
+    if (previousUserId) {
+      try { await clearUserData(previousUserId); } catch { /* best-effort */ }
+    }
+  }, [user]);
 
   const displayName: string = user?.user_metadata?.name ?? 'paddler';
 

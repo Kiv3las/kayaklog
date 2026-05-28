@@ -24,16 +24,18 @@ interface Props {
 
 function buildDict(days: Day[]): RiverSuggestion[] {
   const map = new Map<string, RiverSuggestion>();
+  // `days` arrives sorted newest → oldest. The first time we encounter a
+  // river is therefore the most recent trip on it; only then do we capture
+  // its section/difficulty so the suggestion reflects the latest setup, not
+  // the oldest one. Subsequent encounters just increment the count.
   for (const day of days) {
     for (const river of day.rivers) {
       const key = river.name.toLowerCase();
-      const firstLap = river.laps[0];
       const existing = map.get(key);
       if (existing) {
         existing.count++;
-        if (firstLap?.section) existing.section = firstLap.section;
-        if (firstLap?.difficulty) existing.difficulty = firstLap.difficulty;
       } else {
+        const firstLap = river.laps[0];
         map.set(key, {
           name: river.name,
           country: river.country,

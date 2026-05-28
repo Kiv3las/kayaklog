@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { addDays, format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { isoFromDate, todayISO } from '../lib/dates';
 import { useTheme } from '../lib/themeContext';
 import type { Colors } from '../constants/theme';
@@ -10,8 +11,6 @@ interface Props {
   activeDates: Set<string>;
   flame?: boolean;
 }
-
-const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
 function makeNeutralStyles(c: Colors) {
   return {
@@ -25,13 +24,15 @@ function makeNeutralStyles(c: Colors) {
 }
 
 export default function WeekCalendar({ monday, activeDates, flame = true }: Props) {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const neutral = useMemo(() => makeNeutralStyles(colors), [colors]);
   const today = todayISO();
+  const dayLabels = t('daysOfWeek.veryShort', { returnObjects: true }) as string[];
 
   return (
     <View style={styles.row}>
-      {DAY_LABELS.map((label, i) => {
+      {dayLabels.map((label, i) => {
         const date = addDays(monday, i);
         const iso = isoFromDate(date);
         const isActive = activeDates.has(iso);

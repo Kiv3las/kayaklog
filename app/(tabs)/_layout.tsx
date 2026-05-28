@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, GestureResponderEvent } from 'react-native';
-import { Tabs } from 'expo-router';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../lib/themeContext';
+import { addFormSignal } from '../../lib/addFormSignal';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -12,10 +13,23 @@ function TabIcon({ name, focused, outlineName }: { name: IoniconsName; focused: 
   return <Ionicons name={focused ? name : outlineName} size={24} color={focused ? colors.primary : colors.textTertiary} />;
 }
 
-function AddTabButton({ onPress }: { onPress?: ((e: GestureResponderEvent) => void) | null }) {
+function AddTabButton() {
+  const { t } = useTranslation();
   const { colors } = useTheme();
+  const router = useRouter();
+  // Raise a reset flag the Add screen reads via useFocusEffect, then
+  // navigate. URL-param clearing is unreliable across tab switches, so this
+  // out-of-band signal is what guarantees a blank form after tapping "+".
   return (
-    <TouchableOpacity style={styles.addBtn} onPress={onPress ?? undefined} activeOpacity={0.85} accessibilityLabel="Nuevo día">
+    <TouchableOpacity
+      style={styles.addBtn}
+      onPress={() => {
+        addFormSignal.resetPending = true;
+        router.navigate('/(tabs)/add');
+      }}
+      activeOpacity={0.85}
+      accessibilityLabel={t('newDay')}
+    >
       <View style={[styles.addBtnCircle, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
         <Ionicons name="add" size={32} color="#fff" />
       </View>
@@ -46,7 +60,7 @@ export default function TabLayout() {
         name="add"
         options={{
           title: '',
-          tabBarButton: (props) => <AddTabButton onPress={props.onPress as ((e: GestureResponderEvent) => void) | null} />,
+          tabBarButton: () => <AddTabButton />,
         }}
       />
       <Tabs.Screen name="stats" options={{ title: t('tabs.stats'), tabBarIcon: ({ focused }) => <TabIcon name="bar-chart" focused={focused} outlineName="bar-chart-outline" /> }} />

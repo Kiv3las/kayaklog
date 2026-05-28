@@ -27,6 +27,17 @@ const en: Translations = {
     enterEmailFirst: 'Enter your email first.',
     resetSent: 'We sent you a password reset link. Check your email.',
     confirmEmail: 'Account created. Check your email to confirm it.',
+    emailAlreadyRegistered: 'This email already has an account. Sign in or reset your password.',
+    resetTitle: 'New password',
+    resetSubtitle: 'Create a new password for your account',
+    newPassword: 'New password',
+    confirmPassword: 'Confirm password',
+    passwordTooShort: 'Password must be at least 6 characters',
+    passwordsDontMatch: 'Passwords don\'t match',
+    updatePassword: 'Update password',
+    resetSuccess: 'Password updated',
+    resetSuccessDetail: 'Sign in with your new password.',
+    resetExpired: 'The link expired or is invalid. Request a new one.',
   },
   home: {
     hello: 'Hi, {{name}}',
@@ -124,6 +135,8 @@ const en: Translations = {
     dailyReminder: 'Daily reminder',
     permissionDenied: 'Permission denied',
     enableInSystem: 'Enable notifications in System Settings.',
+    saveFailed: 'Couldn\'t save',
+    tryAgainLater: 'Check your connection and try again.',
     reminderTime: 'Reminder time',
     previewBtn: 'Notification preview',
     notifOnHint: "You'll only receive the reminder on days you haven't logged a session.",
@@ -171,6 +184,15 @@ const en: Translations = {
     startLabel: 'Start · {{names}}',
     endLabel: 'End · {{names}}',
     routeCount: '{{routes}} · {{pins}} {{period}}',
+    pickerTitle: 'Location',
+    pickerCancel: 'Cancel',
+    pickerDone: 'Done',
+    pickerStart: 'Start',
+    pickerEnd: 'End',
+    pickerHintStart: 'Tap the map to place the start pin · Drag to adjust',
+    pickerHintEnd: 'Tap the map to place the end pin · Drag to adjust',
+    pickerNoPermission: 'Permission denied',
+    pickerEnableLocation: 'Enable location in System Settings.',
   },
   filter: {
     title: 'Filter entries',
@@ -207,6 +229,20 @@ const en: Translations = {
     deleteDay: 'Delete day',
     class: 'Class {{level}}',
   },
+  countryPicker: {
+    title: 'Select country',
+    placeholder: 'Select country',
+    search: 'Search country...',
+    close: 'Close',
+  },
+  stars: {
+    label_one: '{{count}} star',
+    label_other: '{{count}} stars',
+  },
+  daysOfWeek: {
+    veryShort: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+  },
+  newDay: 'New day',
 };
 
 export default en;

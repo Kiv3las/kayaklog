@@ -5,6 +5,7 @@ import {
 import MapView, { Marker, Polyline, MapPressEvent, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../lib/themeContext';
 import type { Colors } from '../constants/theme';
 import { LatLng } from '../lib/types';
@@ -102,6 +103,7 @@ function makeStyles(c: Colors) {
 }
 
 export default function MapPicker({ visible, riverName, initialStart, initialEnd, onConfirm, onCancel }: Props) {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [mode, setMode] = useState<PinMode>('start');
@@ -134,7 +136,7 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
 
   async function centerOnMe() {
     if (!locationGranted) {
-      Alert.alert('Sin permiso', 'Activa la ubicación en Ajustes del sistema.');
+      Alert.alert(t('map.pickerNoPermission'), t('map.pickerEnableLocation'));
       return;
     }
     const loc = await Location.getCurrentPositionAsync({});
@@ -158,14 +160,14 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onCancel} style={styles.headerBtn}>
-            <Text style={styles.cancelText}>Cancelar</Text>
+            <Text style={styles.cancelText}>{t('map.pickerCancel')}</Text>
           </TouchableOpacity>
           <View style={styles.headerCenter}>
-            <Text style={styles.title}>Ubicación</Text>
+            <Text style={styles.title}>{t('map.pickerTitle')}</Text>
             {riverName ? <Text style={styles.subtitle}>{riverName}</Text> : null}
           </View>
           <TouchableOpacity onPress={() => onConfirm(startPin, endPin)} style={styles.headerBtn}>
-            <Text style={styles.doneText}>Listo</Text>
+            <Text style={styles.doneText}>{t('map.pickerDone')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -176,7 +178,7 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
           >
             <View style={[styles.pinDot, { backgroundColor: '#34c759' }]} />
             <Text style={[styles.modeBtnText, mode === 'start' && styles.modeBtnTextActive]}>
-              Inicio {startPin ? '✓' : ''}
+              {t('map.pickerStart')} {startPin ? '✓' : ''}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -185,13 +187,13 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
           >
             <View style={[styles.pinDot, { backgroundColor: '#ff3b30' }]} />
             <Text style={[styles.modeBtnText, mode === 'end' && styles.modeBtnTextActive]}>
-              Final {endPin ? '✓' : ''}
+              {t('map.pickerEnd')} {endPin ? '✓' : ''}
             </Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.hint}>
-          Toca el mapa para colocar el pin de {mode === 'start' ? 'inicio' : 'final'} · Arrastra para ajustar
+          {mode === 'start' ? t('map.pickerHintStart') : t('map.pickerHintEnd')}
         </Text>
 
         <MapView
@@ -206,7 +208,7 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
             <Marker
               coordinate={startCoord}
               pinColor="#34c759"
-              title="Inicio"
+              title={t('map.pickerStart')}
               draggable
               onDragEnd={(e) =>
                 setStartPin({ lat: e.nativeEvent.coordinate.latitude, lng: e.nativeEvent.coordinate.longitude })
@@ -217,7 +219,7 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
             <Marker
               coordinate={endCoord}
               pinColor="#ff3b30"
-              title="Final"
+              title={t('map.pickerEnd')}
               draggable
               onDragEnd={(e) =>
                 setEndPin({ lat: e.nativeEvent.coordinate.latitude, lng: e.nativeEvent.coordinate.longitude })

@@ -11,6 +11,12 @@ export type AppLanguage = 'auto' | 'es' | 'en';
 
 // Synchronous init with Spanish as safe default — language is updated
 // before first render via initLanguage() in _layout.tsx.
+//
+// escapeValue: false is safe here because the only render target is React
+// Native, which never parses interpolated strings as HTML. If this app is
+// ever deployed via `expo start --web` to a multi-user web environment,
+// flip this to true (and audit each t() call that intentionally embeds
+// markup) to prevent XSS from user-controlled values like river names.
 i18n.use(initReactI18next).init({
   resources: {
     es: { translation: es },

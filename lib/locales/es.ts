@@ -25,6 +25,17 @@ const es = {
     enterEmailFirst: 'Ingresa tu email primero.',
     resetSent: 'Te enviamos un enlace para restablecer tu contraseña. Revisa tu email.',
     confirmEmail: 'Cuenta creada. Revisa tu email para confirmarla.',
+    emailAlreadyRegistered: 'Este email ya tiene una cuenta. Inicia sesión o restablece tu contraseña.',
+    resetTitle: 'Nueva contraseña',
+    resetSubtitle: 'Crea una contraseña nueva para tu cuenta',
+    newPassword: 'Nueva contraseña',
+    confirmPassword: 'Confirmar contraseña',
+    passwordTooShort: 'La contraseña debe tener al menos 6 caracteres',
+    passwordsDontMatch: 'Las contraseñas no coinciden',
+    updatePassword: 'Actualizar contraseña',
+    resetSuccess: 'Contraseña actualizada',
+    resetSuccessDetail: 'Inicia sesión con tu nueva contraseña.',
+    resetExpired: 'El enlace expiró o no es válido. Solicita uno nuevo.',
   },
   home: {
     hello: 'Hola, {{name}}',
@@ -122,6 +133,8 @@ const es = {
     dailyReminder: 'Recordatorio diario',
     permissionDenied: 'Permiso denegado',
     enableInSystem: 'Activa las notificaciones en Ajustes del sistema.',
+    saveFailed: 'No se pudo guardar',
+    tryAgainLater: 'Revisa tu conexión e intenta de nuevo.',
     reminderTime: 'Hora del recordatorio',
     previewBtn: 'Vista previa de la notificación',
     notifOnHint: 'Solo recibirás el recordatorio los días que no hayas registrado una salida.',
@@ -169,6 +182,15 @@ const es = {
     startLabel: 'Inicio · {{names}}',
     endLabel: 'Final · {{names}}',
     routeCount: '{{routes}} · {{pins}} en {{period}}',
+    pickerTitle: 'Ubicación',
+    pickerCancel: 'Cancelar',
+    pickerDone: 'Listo',
+    pickerStart: 'Inicio',
+    pickerEnd: 'Final',
+    pickerHintStart: 'Toca el mapa para colocar el pin de inicio · Arrastra para ajustar',
+    pickerHintEnd: 'Toca el mapa para colocar el pin de final · Arrastra para ajustar',
+    pickerNoPermission: 'Sin permiso',
+    pickerEnableLocation: 'Activa la ubicación en Ajustes del sistema.',
   },
   filter: {
     title: 'Filtrar registros',
@@ -205,6 +227,20 @@ const es = {
     deleteDay: 'Eliminar día',
     class: 'Clase {{level}}',
   },
+  countryPicker: {
+    title: 'Seleccionar país',
+    placeholder: 'Seleccionar país',
+    search: 'Buscar país...',
+    close: 'Cerrar',
+  },
+  stars: {
+    label_one: '{{count}} estrella',
+    label_other: '{{count}} estrellas',
+  },
+  daysOfWeek: {
+    veryShort: ['L', 'M', 'X', 'J', 'V', 'S', 'D'],
+  },
+  newDay: 'Nuevo día',
 } as const;
 
 export default es;

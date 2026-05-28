@@ -4,6 +4,7 @@ import {
   FlatList, TextInput, SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../lib/themeContext';
 import type { Colors } from '../constants/theme';
 import { COUNTRIES_BY_CONTINENT, Country, countryByCode } from '../lib/countries';
@@ -81,6 +82,7 @@ function makeStyles(c: Colors) {
 }
 
 export default function CountryPicker({ value, onChange }: Props) {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
@@ -106,17 +108,17 @@ export default function CountryPicker({ value, onChange }: Props) {
 
   return (
     <>
-      <TouchableOpacity style={styles.trigger} onPress={() => setOpen(true)} accessibilityLabel="Seleccionar país">
+      <TouchableOpacity style={styles.trigger} onPress={() => setOpen(true)} accessibilityLabel={t('countryPicker.title')}>
         <Text style={styles.flag}>{country?.flag ?? '🏳️'}</Text>
-        <Text style={styles.name}>{country?.name ?? 'Seleccionar país'}</Text>
+        <Text style={styles.name}>{country?.name ?? t('countryPicker.placeholder')}</Text>
         <Ionicons name="chevron-down" size={16} color={colors.textTertiary} />
       </TouchableOpacity>
 
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
         <SafeAreaView style={styles.modal}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Seleccionar país</Text>
-            <TouchableOpacity onPress={() => { setOpen(false); setSearch(''); }} accessibilityLabel="Cerrar">
+            <Text style={styles.modalTitle}>{t('countryPicker.title')}</Text>
+            <TouchableOpacity onPress={() => { setOpen(false); setSearch(''); }} accessibilityLabel={t('countryPicker.close')}>
               <Ionicons name="close" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
@@ -124,7 +126,7 @@ export default function CountryPicker({ value, onChange }: Props) {
             <Ionicons name="search" size={16} color={colors.textTertiary} style={{ marginRight: 6 }} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Buscar país..."
+              placeholder={t('countryPicker.search')}
               value={search}
               onChangeText={setSearch}
               autoFocus

@@ -75,18 +75,25 @@ export function weekBarData(days: Day[], monday: Date): BarDataItem[] {
 
 export function monthBarData(days: Day[], year: number, month: number): BarDataItem[] {
   const monthStart = new Date(year, month - 1, 1, 12);
+  const monthEnd = endOfMonth(monthStart);
+  const monthStartISO = isoFromDate(monthStart);
+  const monthEndISO = isoFromDate(monthEnd);
   const result: BarDataItem[] = [];
   let weekStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   let weekNum = 1;
 
-  while (weekStart <= endOfMonth(monthStart)) {
+  // Iterate every Monday until we pass the end of the month. Clamp each
+  // week's date range to the actual month boundaries so days from adjacent
+  // months don't bleed into S1 or the last week.
+  while (weekStart <= monthEnd) {
     const weekEnd = addDays(weekStart, 6);
-    const weekDays = days.filter((d) => {
-      const iso = d.date;
-      return iso >= isoFromDate(weekStart) && iso <= isoFromDate(weekEnd);
-    });
+    const startISO = isoFromDate(weekStart);
+    const endISO = isoFromDate(weekEnd);
+    const effectiveStart = startISO < monthStartISO ? monthStartISO : startISO;
+    const effectiveEnd = endISO > monthEndISO ? monthEndISO : endISO;
     let km = 0;
-    for (const day of weekDays) {
+    for (const day of days) {
+      if (day.date < effectiveStart || day.date > effectiveEnd) continue;
       for (const river of day.rivers) {
         for (const lap of river.laps) km += lap.km;
       }
@@ -94,7 +101,6 @@ export function monthBarData(days: Day[], year: number, month: number): BarDataI
     result.push({ label: `S${weekNum}`, value: Math.round(km * 10) / 10 });
     weekStart = addDays(weekStart, 7);
     weekNum++;
-    if (weekNum > 5) break;
   }
   return result;
 }
