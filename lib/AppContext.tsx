@@ -91,10 +91,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     // Listen for auth state changes (SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED,
-    // INITIAL_SESSION). supabase-js v2 fires INITIAL_SESSION on subscribe
-    // with the cached session, so this also handles app bootstrap.
+    // INITIAL_SESSION, PASSWORD_RECOVERY). supabase-js v2 fires
+    // INITIAL_SESSION on subscribe with the cached session, so this also
+    // handles app bootstrap.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
+      // During password recovery the user is on /auth/reset to update their
+      // password and then re-login. Skip the full data load — it serves no
+      // purpose for the reset flow and was holding the HTTP client busy long
+      // enough for the subsequent updateUser to time out on slower networks.
+      if (event === 'PASSWORD_RECOVERY') {
+        setUser(session?.user ?? null);
+        return;
+      }
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (currentUser) {

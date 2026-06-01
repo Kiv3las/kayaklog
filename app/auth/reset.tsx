@@ -65,23 +65,54 @@ export default function ResetScreen() {
     if (password !== confirm) { setError(t('auth.passwordsDontMatch')); return; }
     setError('');
     setLoading(true);
+    const t0 = Date.now();
     try {
-      // The deep-link handler in app/_layout.tsx will have already called
-      // supabase.auth.setSession() with the recovery tokens, so the user is
-      // authenticated at this point and updateUser will succeed.
-      const { error: err } = await supabase.auth.updateUser({ password });
-      if (err) {
-        // Most common cause: the recovery session expired or was never set.
-        setError(err.message);
+      // Bypass supabase-js for the actual update. The client's wrapper does
+      // a session-check + sometimes a token-refresh roundtrip first, which
+      // on recovery sessions over flaky networks easily piles up to >15s.
+      // A raw PUT against /auth/v1/user with the existing access token is
+      // a single request and lets us use AbortController for a hard timeout.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setError(t('auth.resetExpired'));
         return;
       }
-      // Sign out the recovery session so the user has to log in normally with
-      // their new password — avoids leaving a privileged session lingering
-      // and gives a clear confirmation that the change took effect.
-      await supabase.auth.signOut();
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      let response: Response;
+      try {
+        response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/auth/v1/user`, {
+          method: 'PUT',
+          headers: {
+            'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ password }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      if (__DEV__) console.log(`[reset] PUT /auth/v1/user → ${response.status} in ${Date.now() - t0}ms`);
+
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        setError(errBody.msg || errBody.message || `HTTP ${response.status}`);
+        return;
+      }
+
+      // Sign out the recovery session — best effort, the password is
+      // already updated server-side so don't block the success path on it.
+      try { await supabase.auth.signOut(); } catch { /* ignore */ }
       Alert.alert(t('auth.resetSuccess'), t('auth.resetSuccessDetail'), [
         { text: 'OK', onPress: () => router.replace('/auth/login' as any) },
       ]);
+    } catch (err: any) {
+      if (err?.name === 'AbortError') setError(t('auth.timeoutError'));
+      else setError(err?.message ?? t('auth.timeoutError'));
     } finally {
       setLoading(false);
     }

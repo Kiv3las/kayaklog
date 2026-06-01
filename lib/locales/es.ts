@@ -36,6 +36,7 @@ const es = {
     resetSuccess: 'Contraseña actualizada',
     resetSuccessDetail: 'Inicia sesión con tu nueva contraseña.',
     resetExpired: 'El enlace expiró o no es válido. Solicita uno nuevo.',
+    timeoutError: 'La conexión tardó demasiado. Verifica tu red e intenta de nuevo.',
   },
   home: {
     hello: 'Hola, {{name}}',

@@ -38,6 +38,7 @@ const en: Translations = {
     resetSuccess: 'Password updated',
     resetSuccessDetail: 'Sign in with your new password.',
     resetExpired: 'The link expired or is invalid. Request a new one.',
+    timeoutError: 'Connection took too long. Check your network and try again.',
   },
   home: {
     hello: 'Hi, {{name}}',
