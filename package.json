@@ -9,17 +9,17 @@
     "@react-native-community/datetimepicker": "9.1.0",
     "@supabase/supabase-js": "^2.106.2",
     "date-fns": "^4.3.0",
-    "expo": "~56.0.0",
+    "expo": "~56.0.8",
     "expo-asset": "~56.0.15",
     "expo-clipboard": "~56.0.3",
     "expo-constants": "~56.0.16",
     "expo-font": "~56.0.5",
     "expo-linear-gradient": "~56.0.4",
-    "expo-linking": "~56.0.12",
+    "expo-linking": "~56.0.13",
     "expo-localization": "~56.0.6",
-    "expo-location": "~56.0.14",
-    "expo-notifications": "~56.0.14",
-    "expo-router": "~56.2.7",
+    "expo-location": "~56.0.15",
+    "expo-notifications": "~56.0.15",
+    "expo-router": "~56.2.8",
     "expo-secure-store": "~56.0.4",
     "expo-splash-screen": "~56.0.10",
     "expo-status-bar": "~56.0.4",
@@ -41,8 +41,8 @@
     "react-native-worklets": "0.8.3"
   },
   "devDependencies": {
-    "@types/react": "~19.1.10",
-    "typescript": "~5.9.2"
+    "@types/react": "~19.2.14",
+    "typescript": "~6.0.3"
   },
   "overrides": {
     "uuid": "^11.1.1"
