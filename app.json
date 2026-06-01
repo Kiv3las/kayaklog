@@ -25,7 +25,11 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "cl.ivelic.kayaklog",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -67,6 +71,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2c513646-8044-4b16-8096-2c62015a1961"
+      }
+    },
+    "owner": "kilianivelic"
   }
 }
