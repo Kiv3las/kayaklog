@@ -33,3 +33,40 @@ BEGIN
     RAISE WARNING 'days table has % rows violating the new constraints', bad_count;
   END IF;
 END $$;
+
+-- ── rivers payload sanity (security audit finding #3) ─────────────────────────
+-- RLS already limits writes to the user's own rows, but a modified client could
+-- still store nonsensical values (negative km, stars=9999, invalid class) in its
+-- OWN rows, corrupting that user's stats. A CHECK constraint can't contain a
+-- subquery, so the per-lap range validation lives in an IMMUTABLE helper that
+-- only inspects its argument (no table access) and is safe to call from CHECK.
+
+CREATE OR REPLACE FUNCTION days_rivers_valid(rivers jsonb)
+  RETURNS boolean
+  LANGUAGE sql
+  IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN rivers IS NULL THEN true
+    WHEN jsonb_typeof(rivers) <> 'array' THEN false
+    ELSE NOT EXISTS (
+      SELECT 1
+      FROM jsonb_array_elements(rivers) AS r
+      CROSS JOIN LATERAL jsonb_array_elements(
+        CASE WHEN jsonb_typeof(r->'laps') = 'array' THEN r->'laps' ELSE '[]'::jsonb END
+      ) AS l
+      WHERE (l->>'km')::numeric      < 0
+         OR (l->>'km')::numeric      > 1000
+         OR (l->>'stars')::int       NOT BETWEEN 0 AND 5
+         OR (l->>'hours')::int       NOT BETWEEN 0 AND 48
+         OR (l->>'minutes')::int     NOT BETWEEN 0 AND 59
+         OR (l ? 'difficulty' AND l->>'difficulty' NOT IN ('I','II','III','IV','V','VI'))
+    )
+  END;
+$$;
+
+ALTER TABLE days DROP CONSTRAINT IF EXISTS days_rivers_sane;
+-- NOTE: ADD CONSTRAINT validates existing rows. If it errors, an existing row
+-- has out-of-range values that must be cleaned up first.
+ALTER TABLE days
+  ADD CONSTRAINT days_rivers_sane CHECK (days_rivers_valid(rivers));

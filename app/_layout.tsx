@@ -46,7 +46,12 @@ function PasswordResetLinkHandler() {
   useEffect(() => {
     async function handle(url: string | null) {
       if (!url) return;
-      if (__DEV__) console.log('[reset-handler] incoming url:', url);
+      if (__DEV__) {
+        // Redact query/fragment: they carry the recovery code and (in the
+        // implicit flow) the access/refresh tokens. Never log them, even in dev.
+        const safe = url.split('#')[0].split('?')[0];
+        console.log('[reset-handler] incoming url:', safe, '(query/fragment redacted)');
+      }
 
       // Split URL into query and fragment portions. React Native's URL
       // implementation chokes on custom schemes, so we parse by hand.
