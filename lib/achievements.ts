@@ -142,7 +142,7 @@ const LEGEND_COLOR = '#ffb800';
 // and "Río X" prefixes don't break the match.
 export const LEGENDARY_RIVERS: string[] = [
   'Indus', 'Stikine', 'Bravo', 'Pascua', 'Baker', 'Rauma', 'Muksu', 'Sogndal',
-  'Fuy', 'Fantasy Falls', 'Upper Cherry', 'Humla Karnali', 'Glomoga', 'Ikopa',
+  'Fuy', 'Fantasy Falls', 'Upper Cherry', 'Humla Karnali', 'Glomåga', 'Ikopa',
   'Bashkaus', 'Sary-Jaz', 'Zambezi', 'Futaleufú', 'Mayer', 'Cuervo', 'Claro',
   'Blanco', 'Trancura', 'Nevados', 'Palguín', 'Puesco', 'Puelo',
   'Little White Salmon', 'Kaituna', 'Keldua', 'Royal Gorge',
