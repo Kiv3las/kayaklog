@@ -10,13 +10,16 @@ import { useApp } from '../../lib/AppContext';
 import { useTheme } from '../../lib/themeContext';
 import type { Colors } from '../../constants/theme';
 import { computeStreaks } from '../../lib/streak';
+import { computeAchievements, computeTotals } from '../../lib/achievements';
 import { statsForDays, formatTime } from '../../lib/stats';
 import { formatDisplayDate, todayISO } from '../../lib/dates';
 import { countryByCode } from '../../lib/countries';
 import { spacing, radius } from '../../constants/theme';
+import { shareViewAsImage } from '../../lib/share';
 import StreakWidget from '../../components/StreakWidget';
 import GearButton from '../../components/GearButton';
 import PaddleIcon from '../../components/PaddleIcon';
+import ShareCard from '../../components/ShareCard';
 
 const { width } = Dimensions.get('window');
 
@@ -40,7 +43,13 @@ function makeStyles(c: Colors) {
       padding: spacing.md,
       marginBottom: spacing.md,
     },
-    seasonTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: spacing.sm },
+    seasonHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+    seasonTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    shareBtn: {
+      width: 32, height: 32, borderRadius: 16,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.2)',
+    },
     statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     statItem: { width: '30%', alignItems: 'center', paddingVertical: 10 },
     statValue: { color: '#fff', fontSize: 18, fontWeight: '800' },
@@ -61,6 +70,25 @@ function makeStyles(c: Colors) {
       letterSpacing: 0.5,
       marginBottom: 6,
     },
+    achCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: c.cardBg,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    achIcon: {
+      width: 40, height: 40, borderRadius: 20,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: `${c.starGold}22`,
+    },
+    achTitle: { fontSize: 15, fontWeight: '700', color: c.textPrimary },
+    achSub: { fontSize: 12, color: c.textTertiary, marginTop: 1 },
+    achCount: { fontSize: 15, fontWeight: '800', color: c.primary },
     lastDate: { fontSize: 16, fontWeight: '700', color: c.textPrimary, marginBottom: 6 },
     lastRiver: { fontSize: 14, color: c.textSecondary, marginBottom: 2 },
     actionsRow: { flexDirection: 'row', gap: 12 },
@@ -106,7 +134,10 @@ export default function InicioScreen() {
 
   const yearDays = useMemo(() => days.filter((d) => d.date.startsWith(`${currentYear}`)), [days, currentYear]);
   const yearStats = useMemo(() => statsForDays(yearDays), [yearDays]);
+  const seasonTotals = useMemo(() => computeTotals(yearDays), [yearDays]);
+  const ach = useMemo(() => computeAchievements(days), [days]);
   const lastDay = days[0];
+  const shareRef = useRef<View>(null);
 
   if (isLoading) return <View style={styles.loading}><Text>{t('home.loading')}</Text></View>;
 
@@ -140,7 +171,18 @@ export default function InicioScreen() {
         <StreakWidget days={days} />
 
         <View style={styles.seasonCard}>
-          <Text style={styles.seasonTitle}>{t('home.season', { year: currentYear })}</Text>
+          <View style={styles.seasonHeader}>
+            <Text style={styles.seasonTitle}>{t('home.season', { year: currentYear })}</Text>
+            {yearStats.days > 0 && (
+              <TouchableOpacity
+                style={styles.shareBtn}
+                onPress={() => shareViewAsImage(shareRef)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="share-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
           <View style={styles.statsGrid}>
             <StatItem label={t('home.km')} value={`${yearStats.km}`} icon="speedometer-outline" />
             <StatItem label={t('home.laps')} value={`${yearStats.laps}`} icon="repeat-outline" />
@@ -150,6 +192,18 @@ export default function InicioScreen() {
             <StatItem label={t('home.days')} value={`${yearStats.days}`} icon="calendar-outline" />
           </View>
         </View>
+
+        <TouchableOpacity style={styles.achCard} onPress={() => router.push('/achievements' as any)} activeOpacity={0.85}>
+          <View style={styles.achIcon}>
+            <Ionicons name="trophy" size={20} color={colors.starGold} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.achTitle}>{t('achievements.homeCard')}</Text>
+            <Text style={styles.achSub}>{t('achievements.unlocked', { count: ach.unlockedCount, total: ach.total })}</Text>
+          </View>
+          <Text style={styles.achCount}>{ach.unlockedCount}/{ach.total}</Text>
+          <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+        </TouchableOpacity>
 
         {lastDay && (
           <View style={styles.card}>
@@ -181,6 +235,19 @@ export default function InicioScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <ShareCard
+        ref={shareRef}
+        data={{
+          name: displayName,
+          year: currentYear,
+          km: seasonTotals.km,
+          days: seasonTotals.days,
+          rivers: seasonTotals.rivers,
+          streak: seasonTotals.longestStreak,
+          hardestClass: seasonTotals.hardestClass,
+        }}
+      />
     </SafeAreaView>
   );
 }
