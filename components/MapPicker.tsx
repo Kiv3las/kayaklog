@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Modal, Platform, Alert,
+  View, Text, StyleSheet, TouchableOpacity, Modal, Platform, Alert, TextInput,
 } from 'react-native';
 import MapView, { Marker, Polyline, MapPressEvent, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -52,6 +52,17 @@ function makeStyles(c: Colors) {
     subtitle: { fontSize: 12, color: c.textTertiary, marginTop: 1 },
     cancelText: { color: c.danger, fontSize: 15 },
     doneText: { color: c.primary, fontSize: 15, fontWeight: '700', textAlign: 'right' },
+    searchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: spacing.md,
+      paddingVertical: Platform.OS === 'ios' ? 12 : 6,
+      backgroundColor: c.cardBg,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    searchInput: { flex: 1, fontSize: 15, color: c.textPrimary, paddingVertical: 0 },
     modeRow: {
       flexDirection: 'row',
       gap: 8,
@@ -114,6 +125,8 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
   const [endPin, setEndPin] = useState<LatLng | undefined>(initialEnd);
   const [locationGranted, setLocationGranted] = useState(false);
   const [satellite, setSatellite] = useState(false);
+  const [search, setSearch] = useState('');
+  const [searching, setSearching] = useState(false);
   const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
@@ -135,6 +148,29 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
       setMode('end');
     } else {
       setEndPin(pin);
+    }
+  }
+
+  async function handleSearch() {
+    const q = search.trim();
+    if (!q) return;
+    setSearching(true);
+    try {
+      const results = await Location.geocodeAsync(q);
+      if (results.length > 0) {
+        mapRef.current?.animateToRegion({
+          latitude: results[0].latitude,
+          longitude: results[0].longitude,
+          latitudeDelta: 0.08,
+          longitudeDelta: 0.08,
+        }, 600);
+      } else {
+        Alert.alert(t('map.searchNoResults'));
+      }
+    } catch {
+      Alert.alert(t('map.searchNoResults'));
+    } finally {
+      setSearching(false);
     }
   }
 
@@ -178,6 +214,26 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
           <TouchableOpacity onPress={() => onConfirm(startPin, endPin)} style={styles.headerBtn}>
             <Text style={styles.doneText}>{t('map.pickerDone')}</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.searchRow}>
+          <Ionicons name="search" size={18} color={colors.textTertiary} />
+          <TextInput
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder={t('map.searchPlaceholder')}
+            placeholderTextColor={colors.textTertiary}
+            returnKeyType="search"
+            onSubmitEditing={handleSearch}
+            autoCorrect={false}
+            editable={!searching}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.modeRow}>

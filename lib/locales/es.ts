@@ -172,6 +172,8 @@ const es = {
     back: 'Atrás',
     all: 'Todo',
     satellite: 'Vista satelital',
+    searchPlaceholder: 'Buscar lugar...',
+    searchNoResults: 'No se encontró ese lugar',
     start: 'Inicio',
     end: 'Final',
     putIn: 'Put in',

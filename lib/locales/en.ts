@@ -174,6 +174,8 @@ const en: Translations = {
     back: 'Back',
     all: 'All',
     satellite: 'Satellite view',
+    searchPlaceholder: 'Search place...',
+    searchNoResults: 'Place not found',
     start: 'Start',
     end: 'End',
     putIn: 'Put in',
