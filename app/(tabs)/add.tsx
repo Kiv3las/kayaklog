@@ -756,12 +756,22 @@ export default function AddScreen() {
         const loc = sec === null
           ? { start: lap?.startLocation, end: lap?.endLocation }
           : (lap?.sectionLocations?.[sec] ?? {});
+        // Other sections' pins, shown faded for context while placing this one.
+        const referencePins = sec === null ? [] : sectionParts(lap?.section)
+          .filter((p) => p !== sec)
+          .map((p) => ({
+            label: sectionLabel(p, t),
+            start: lap?.sectionLocations?.[p]?.start,
+            end: lap?.sectionLocations?.[p]?.end,
+          }))
+          .filter((r) => r.start || r.end);
         return (
           <MapPicker
             visible
             riverName={rivers[mapPicker.ri]?.name || undefined}
             initialStart={loc.start}
             initialEnd={loc.end}
+            referencePins={referencePins}
             onConfirm={(start, end) => {
               if (sec === null) {
                 // Legacy single location: pins win, recompute km from them.

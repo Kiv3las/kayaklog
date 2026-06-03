@@ -18,6 +18,9 @@ interface Props {
   riverName?: string;
   initialStart?: LatLng;
   initialEnd?: LatLng;
+  // Other sections' pins, shown faded and non-editable for context so the
+  // user can place this section's put-in/take-out relative to them.
+  referencePins?: { label: string; start?: LatLng; end?: LatLng }[];
   onConfirm: (start?: LatLng, end?: LatLng) => void;
   onCancel: () => void;
 }
@@ -102,7 +105,7 @@ function makeStyles(c: Colors) {
   });
 }
 
-export default function MapPicker({ visible, riverName, initialStart, initialEnd, onConfirm, onCancel }: Props) {
+export default function MapPicker({ visible, riverName, initialStart, initialEnd, referencePins, onConfirm, onCancel }: Props) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -151,9 +154,14 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
   const startCoord = startPin ? { latitude: startPin.lat, longitude: startPin.lng } : null;
   const endCoord = endPin ? { latitude: endPin.lat, longitude: endPin.lng } : null;
 
+  // Center on this section's pin, or fall back to a neighboring section's pin
+  // so its context is in view when starting a fresh section.
+  const refAnchor = referencePins?.map((r) => r.start ?? r.end).find(Boolean);
   const initialRegion: Region = initialStart
     ? { latitude: initialStart.lat, longitude: initialStart.lng, latitudeDelta: 0.15, longitudeDelta: 0.15 }
-    : DEFAULT_REGION;
+    : refAnchor
+      ? { latitude: refAnchor.lat, longitude: refAnchor.lng, latitudeDelta: 0.15, longitudeDelta: 0.15 }
+      : DEFAULT_REGION;
 
   return (
     <Modal visible={visible} animationType="slide" statusBarTranslucent>
@@ -204,6 +212,37 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
           showsMyLocationButton={false}
           onPress={handleMapPress}
         >
+          {referencePins?.map((ref, idx) => (
+            <React.Fragment key={`ref-${idx}`}>
+              {ref.start && (
+                <Marker
+                  coordinate={{ latitude: ref.start.lat, longitude: ref.start.lng }}
+                  pinColor="#34c759"
+                  opacity={0.5}
+                  title={`${ref.label} · ${t('map.pickerStart')}`}
+                />
+              )}
+              {ref.end && (
+                <Marker
+                  coordinate={{ latitude: ref.end.lat, longitude: ref.end.lng }}
+                  pinColor="#ff3b30"
+                  opacity={0.5}
+                  title={`${ref.label} · ${t('map.pickerEnd')}`}
+                />
+              )}
+              {ref.start && ref.end && (
+                <Polyline
+                  coordinates={[
+                    { latitude: ref.start.lat, longitude: ref.start.lng },
+                    { latitude: ref.end.lat, longitude: ref.end.lng },
+                  ]}
+                  strokeColor={colors.textTertiary}
+                  strokeWidth={2}
+                  lineDashPattern={[4, 4]}
+                />
+              )}
+            </React.Fragment>
+          ))}
           {startCoord && (
             <Marker
               coordinate={startCoord}
