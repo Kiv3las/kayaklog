@@ -183,7 +183,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // can purge their local cache files. Without this, a logout on a shared
     // device leaves the previous user's data sitting in AsyncStorage.
     const previousUserId = user?.id;
-    await supabase.auth.signOut();
+    // Local scope clears the device session without a network round-trip, so
+    // sign-out is instant and works even on a flaky/offline connection. A
+    // global sign-out can hang indefinitely waiting to revoke server-side.
+    await supabase.auth.signOut({ scope: 'local' });
     if (previousUserId) {
       try { await clearUserData(previousUserId); } catch { /* best-effort */ }
     }
