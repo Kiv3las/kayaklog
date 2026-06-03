@@ -88,6 +88,14 @@ function makeStyles(c: Colors) {
     saveBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
     signOutRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
     signOutText: { fontSize: 15, color: c.danger, fontWeight: '600' },
+    deleteRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+      marginTop: 8,
+    },
     version: { textAlign: 'center', color: c.textTertiary, fontSize: 12, marginTop: 8 },
     optionRow: {
       flexDirection: 'row',
@@ -127,12 +135,13 @@ export default function SettingsScreen() {
   const { t } = useTranslation();
   const { colors, mode: appearanceMode, setMode: setAppearanceMode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { settings, updateSettings, days, displayName, updateName, signOut } = useApp();
+  const { settings, updateSettings, days, displayName, updateName, signOut, deleteAccount } = useApp();
   const router = useRouter();
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [nameInput, setNameInput] = useState(displayName === 'paddler' ? '' : displayName);
   const [savingName, setSavingName] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [language, setLanguage] = useState<AppLanguage>('auto');
 
   useEffect(() => { loadSavedLanguage().then(setLanguage); }, []);
@@ -189,6 +198,31 @@ export default function SettingsScreen() {
       }
     }
     await updateSettings({ ...settings, notifEnabled: value });
+  }
+
+  function confirmDeleteAccount() {
+    Alert.alert(
+      t('settings.deleteAccountTitle'),
+      t('settings.deleteAccountConfirm'),
+      [
+        { text: t('settings.cancelBtn'), style: 'cancel' },
+        {
+          text: t('settings.deleteAccountBtn'),
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingAccount(true);
+            try {
+              const ok = await deleteAccount();
+              // On success, signOut inside deleteAccount triggers the redirect
+              // to the login screen via AuthGate.
+              if (!ok) Alert.alert(t('settings.deleteAccountFailed'), t('settings.tryAgainLater'));
+            } finally {
+              setDeletingAccount(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   async function onTimeChange(_: unknown, selected?: Date) {
@@ -369,6 +403,18 @@ export default function SettingsScreen() {
             <Ionicons name="log-out-outline" size={20} color={colors.danger} style={{ marginRight: 8 }} />
             <Text style={styles.signOutText}>{t('settings.signOut')}</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.deleteRow}
+            onPress={confirmDeleteAccount}
+            disabled={deletingAccount}
+          >
+            <Ionicons name="trash-outline" size={20} color={colors.danger} style={{ marginRight: 8 }} />
+            <Text style={styles.signOutText}>
+              {deletingAccount ? t('settings.deleting') : t('settings.deleteAccount')}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.hint}>{t('settings.deleteAccountHint')}</Text>
         </View>
 
         <Text style={styles.version}>KayakLog · v1.0.0</Text>

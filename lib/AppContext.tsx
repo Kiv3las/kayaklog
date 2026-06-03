@@ -26,6 +26,7 @@ interface AppContextValue {
   updateSettings: (settings: Settings) => Promise<void>;
   updateName: (name: string) => Promise<boolean>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -188,12 +189,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
+  const deleteAccount = useCallback(async (): Promise<boolean> => {
+    // Account + auth-user deletion needs the service_role, so it runs in the
+    // `delete-account` Edge Function (invoke attaches the user's JWT). On
+    // success the auth user is gone — sign out and purge the local cache so
+    // nothing lingers on the device.
+    const previousUserId = user?.id;
+    const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
+    if (error) return false;
+    await supabase.auth.signOut();
+    if (previousUserId) {
+      try { await clearUserData(previousUserId); } catch { /* best-effort */ }
+    }
+    return true;
+  }, [user]);
+
   const displayName: string = user?.user_metadata?.name ?? 'paddler';
 
   return (
     <AppContext.Provider value={{
       days, settings, user, displayName, isLoading, isSyncing,
-      addDay, updateDay, deleteDay, updateSettings, updateName, signOut,
+      addDay, updateDay, deleteDay, updateSettings, updateName, signOut, deleteAccount,
     }}>
       {children}
     </AppContext.Provider>
