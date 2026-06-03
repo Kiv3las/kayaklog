@@ -21,7 +21,8 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "kilian@ivelic.cl"
+        "appleId": "kilian@ivelic.cl",
+        "ascAppId": "6776247913"
       }
     }
   }
