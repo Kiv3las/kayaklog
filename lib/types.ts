@@ -3,6 +3,11 @@ export interface LatLng {
   lng: number;
 }
 
+export interface SectionLoc {
+  start?: LatLng;
+  end?: LatLng;
+}
+
 export interface Lap {
   km: number;
   hours: number;
@@ -11,8 +16,13 @@ export interface Lap {
   note: string;
   difficulty?: Difficulty;
   section?: string;
+  // Legacy single put-in/take-out — kept for backward compatibility with
+  // laps logged before per-section locations existed.
   startLocation?: LatLng;
   endLocation?: LatLng;
+  // Per-section put-in/take-out, keyed by section name (Alto/Medio/Bajo or a
+  // custom section). When present, supersedes startLocation/endLocation.
+  sectionLocations?: Record<string, SectionLoc>;
 }
 
 export interface River {

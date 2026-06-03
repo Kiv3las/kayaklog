@@ -10,9 +10,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useApp } from '../../lib/AppContext';
 import { useTheme } from '../../lib/themeContext';
 import type { Colors } from '../../constants/theme';
-import { Day, River, Lap, Difficulty, LatLng } from '../../lib/types';
+import { Day, River, Lap, Difficulty, LatLng, SectionLoc } from '../../lib/types';
 import { isoFromDate, parseDateISO, formatDisplayDate } from '../../lib/dates';
 import { haversineKm } from '../../lib/geo';
+import { normalizeSection, isPresetCombo, sectionParts } from '../../lib/sections';
 import { addFormSignal } from '../../lib/addFormSignal';
 import { spacing, radius } from '../../constants/theme';
 import { refreshNotificationSchedule } from '../../lib/notifications';
@@ -28,12 +29,10 @@ const SECTION_I18N: Record<string, string> = {
   Alto: 'add.sectionAlto', Medio: 'add.sectionMedio', Bajo: 'add.sectionBajo', Todo: 'add.sectionTodo',
 };
 
-// "Todo" is treated as the combination Alto-Medio-Bajo for matching purposes.
-// Storage normalizes "Todo" → "Alto-Medio-Bajo" so the existing combo lookup
-// path (split on "-") sums them automatically. This helper covers legacy
-// records still stored as the literal "Todo".
-function normalizeSection(section: string): string {
-  return section.trim() === 'Todo' ? 'Alto-Medio-Bajo' : section.trim();
+// Display label for a single section part: translate the presets, show custom
+// names verbatim.
+function sectionLabel(part: string, t: (key: any) => string): string {
+  return SECTION_I18N[part] ? t(SECTION_I18N[part]) : part;
 }
 
 function isPresetActive(section: string | undefined, preset: string): boolean {
@@ -49,8 +48,8 @@ function isPresetActive(section: string | undefined, preset: string): boolean {
 function togglePreset(current: string, preset: string): string {
   if (preset === 'Todo') {
     // Tapping Todo selects all three sub-sections (or clears, if all are
-    // already selected). Stored as the explicit combo so suggestForLap can
-    // sum the individual histories without a special case.
+    // already selected). Stored as the explicit combo so each sub-section gets
+    // its own per-section location block.
     return isPresetActive(current, 'Todo') ? '' : 'Alto-Medio-Bajo';
   }
   const parts: string[] = current.split('-').filter((p) => p === 'Alto' || p === 'Medio' || p === 'Bajo');
@@ -62,17 +61,6 @@ function togglePreset(current: string, preset: string): string {
     parts.sort((a, b) => SECTION_PRESETS.indexOf(a) - SECTION_PRESETS.indexOf(b));
   }
   return parts.join('-');
-}
-
-// True if a section string is just a combination of Alto/Medio/Bajo (or the
-// legacy literal "Todo"). Used to separate "custom" section names from the
-// standard preset combos when listing per-river custom buttons.
-function isPresetCombo(section: string): boolean {
-  const s = section.trim();
-  if (!s) return false;
-  if (s === 'Todo') return true;
-  const parts = s.split('-');
-  return parts.every((p) => p === 'Alto' || p === 'Medio' || p === 'Bajo');
 }
 
 // Derive the list of custom section names the user has previously logged for
@@ -108,130 +96,78 @@ function newDayId(): number {
   return Date.now() * 1000 + Math.floor(Math.random() * 1000);
 }
 
-// Suggestion for a new/edited lap based on previous trips for the same river.
-// Match priority:
-//   1) Exact section match → reuse that lap's km + pins
-//   2) Multi-section combo (e.g. "Alto-Medio") → if every sub-section has a
-//      historical lap, return the SUM of their km and assemble the route:
-//      start = first sub-section's start pin, end = last sub-section's end pin
-//   3) Any lap of this river (pins only) → so a new section still gets a
-//      starting reference pin to drag from
-// Callers decide when to apply each piece (typically only when the user
-// hasn't already typed/placed something).
-function suggestForLap(
-  days: Day[],
-  riverName: string,
-  section: string,
-): { km?: number; startLocation?: LatLng; endLocation?: LatLng } {
+// Straight-line distance summed across a lap's selected sections. Only
+// sections with BOTH pins contribute. Returns 0 when nothing is measurable.
+function autoKm(section: string | undefined, sl: Record<string, SectionLoc> | undefined): number {
+  let total = 0;
+  for (const part of sectionParts(section)) {
+    const loc = sl?.[part];
+    if (loc?.start && loc?.end) total += haversineKm(loc.start, loc.end);
+  }
+  return Math.round(total * 10) / 10;
+}
+
+// Previously-logged pins for one section of a river, so re-logging a known
+// section pre-fills its put-in/take-out. Checks the per-section store first,
+// then legacy single-section laps.
+function findSectionPins(days: Day[], riverName: string, part: string): SectionLoc | undefined {
   const normName = riverName.trim().toLowerCase();
-  if (!normName) return {};
-  // Normalize so "Todo" and "Alto-Medio-Bajo" match each other in lookup,
-  // covering both new entries (stored as the combo) and legacy "Todo" rows.
-  const normSection = normalizeSection(section ?? '');
-
-  function findLap(sec: string): Lap | undefined {
-    const target = normalizeSection(sec);
-    for (const day of days) {
-      for (const river of day.rivers) {
-        if (river.name.trim().toLowerCase() !== normName) continue;
-        for (const lap of river.laps) {
-          if (normalizeSection((lap.section ?? '').trim()) === target) return lap;
-        }
-      }
-    }
-    return undefined;
-  }
-
-  // 1) Exact section match → authoritative (km always returned, even if 0,
-  //    so callers can distinguish "matched but no km recorded" from "no match").
-  const exact = findLap(normSection);
-  if (exact) {
-    return {
-      km: exact.km,
-      startLocation: exact.startLocation,
-      endLocation: exact.endLocation,
-    };
-  }
-
-  // 2) Multi-section combo: only suggest when every sub-section has a
-  //    historical lap, otherwise the sum would underrepresent the distance.
-  //    Authoritative — caller should overwrite pins and km.
-  const parts = normSection.split('-').filter(Boolean);
-  if (parts.length > 1) {
-    const subLaps = parts.map((p) => findLap(p));
-    if (subLaps.every((l): l is Lap => l !== undefined)) {
-      const totalKm = subLaps.reduce((sum, l) => sum + (l.km || 0), 0);
-      return {
-        km: Math.round(totalKm * 10) / 10,
-        startLocation: subLaps[0].startLocation,
-        endLocation: subLaps[subLaps.length - 1].endLocation,
-      };
-    }
-  }
-
-  // 3) Reference fallback: any lap with pins on this river. Non-authoritative
-  //    (no km returned) — the user is paddling an unfamiliar section so the
-  //    pins are just a starting reference to drag from.
+  if (!normName) return undefined;
+  const target = normalizeSection(part);
   for (const day of days) {
     for (const river of day.rivers) {
       if (river.name.trim().toLowerCase() !== normName) continue;
       for (const lap of river.laps) {
-        if (lap.startLocation) {
-          return {
-            startLocation: lap.startLocation,
-            endLocation: lap.endLocation,
-          };
+        const sl = lap.sectionLocations?.[part];
+        if (sl?.start || sl?.end) return { start: sl.start, end: sl.end };
+        if (normalizeSection((lap.section ?? '').trim()) === target && (lap.startLocation || lap.endLocation)) {
+          return { start: lap.startLocation, end: lap.endLocation };
         }
       }
     }
   }
-
-  return {};
+  return undefined;
 }
 
-// Build a partial Lap update from a suggestion. A suggestion is
-// "authoritative" when it came from a real historical match (exact section
-// or full multi-section combo) — in that case the new pins and km should
-// REPLACE whatever was on the lap, since the previous values were tied to
-// a different section and are no longer relevant. A non-authoritative
-// suggestion (just any pin on this river) only fills empty fields.
-// `forcePins` is used by the MapPicker confirm — pins the user just placed
-// always win, regardless of authority.
-function applySuggestion(
-  current: Lap,
-  newSection: string,
-  suggestion: { km?: number; startLocation?: LatLng; endLocation?: LatLng },
-  forcePins?: { startLocation?: LatLng; endLocation?: LatLng },
-): Partial<Lap> {
-  const patch: Partial<Lap> = { section: newSection };
-  const authoritative = suggestion.km !== undefined;
-
-  if (forcePins) {
-    patch.startLocation = forcePins.startLocation;
-    patch.endLocation = forcePins.endLocation;
-  } else if (authoritative) {
-    if (suggestion.startLocation) patch.startLocation = suggestion.startLocation;
-    if (suggestion.endLocation) patch.endLocation = suggestion.endLocation;
-  } else {
-    if (!current.startLocation && suggestion.startLocation) patch.startLocation = suggestion.startLocation;
-    if (!current.endLocation && suggestion.endLocation) patch.endLocation = suggestion.endLocation;
+// Per-section pin store for a lap switching to `section`: migrate a legacy
+// single location once (start→first section, end→last section), then pre-fill
+// each section's pins from history where the lap doesn't already have them.
+// Existing pins are never overwritten, and legacy fields are left intact.
+function buildSectionLocations(days: Day[], riverName: string, lap: Lap, section: string): Record<string, SectionLoc> {
+  const parts = sectionParts(section);
+  const sl: Record<string, SectionLoc> = { ...(lap.sectionLocations ?? {}) };
+  if (Object.keys(sl).length === 0 && (lap.startLocation || lap.endLocation) && parts.length > 0) {
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    sl[first] = { ...(sl[first] ?? {}), start: lap.startLocation };
+    sl[last] = { ...(sl[last] ?? {}), end: lap.endLocation };
   }
-
-  const finalStart = patch.startLocation ?? current.startLocation;
-  const finalEnd = patch.endLocation ?? current.endLocation;
-
-  if (authoritative) {
-    if ((suggestion.km ?? 0) > 0) {
-      patch.km = suggestion.km;
-    } else if (finalStart && finalEnd) {
-      patch.km = Math.round(haversineKm(finalStart, finalEnd) * 10) / 10;
+  for (const part of parts) {
+    const cur = sl[part];
+    if (!cur?.start && !cur?.end) {
+      const hist = findSectionPins(days, riverName, part);
+      if (hist) sl[part] = hist;
     }
-    // else: authoritative match but no km and no pins — leave current alone.
-  } else if (current.km === 0 && finalStart && finalEnd) {
-    patch.km = Math.round(haversineKm(finalStart, finalEnd) * 10) / 10;
   }
+  return sl;
+}
 
-  return patch;
+// On edit-load, surface a legacy single location inside the per-section UI so
+// old pins are visible immediately (start→first section, end→last section).
+// Pure remap of the saved location — never pulls from history and never
+// touches km, so the user's saved values are preserved until they edit a pin.
+function migrateLegacyLap(lap: Lap): Lap {
+  const parts = sectionParts(lap.section);
+  if (lap.sectionLocations || parts.length === 0 || (!lap.startLocation && !lap.endLocation)) return lap;
+  const sl: Record<string, SectionLoc> = {};
+  sl[parts[0]] = { start: lap.startLocation };
+  const last = parts[parts.length - 1];
+  sl[last] = { ...(sl[last] ?? {}), end: lap.endLocation };
+  return { ...lap, sectionLocations: sl };
+}
+
+function migrateRivers(rivers: River[]): River[] {
+  return rivers.map((r) => ({ ...r, laps: r.laps.map(migrateLegacyLap) }));
 }
 
 function makeStyles(c: Colors) {
@@ -361,6 +297,8 @@ function makeStyles(c: Colors) {
     addLapBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-start' },
     addLapText: { color: c.primary, fontSize: 14, fontWeight: '600' },
     locationRow: { flexDirection: 'row', gap: 8 },
+    sectionLocBlock: { marginBottom: 8 },
+    sectionLocLabel: { fontSize: 12, fontWeight: '600', color: c.textSecondary, marginBottom: 4 },
     locationBtn: {
       flex: 1,
       flexDirection: 'row',
@@ -412,9 +350,11 @@ export default function AddScreen() {
 
   const [date, setDate] = useState<Date>(existingDay ? parseDateISO(existingDay.date) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [mapPicker, setMapPicker] = useState<{ ri: number; li: number } | null>(null);
+  // `section` is the section part the picker targets (Alto/Medio/…); null
+  // means the legacy single put-in/take-out (laps with no section selected).
+  const [mapPicker, setMapPicker] = useState<{ ri: number; li: number; section: string | null } | null>(null);
   const [notes, setNotes] = useState(existingDay?.notes ?? '');
-  const [rivers, setRivers] = useState<River[]>(existingDay?.rivers ?? [emptyRiver()]);
+  const [rivers, setRivers] = useState<River[]>(existingDay ? migrateRivers(existingDay.rivers) : [emptyRiver()]);
 
   // The (tabs)/add screen stays mounted across navigations, so the useState
   // initializers above only run on first mount. Re-sync the form whenever
@@ -430,7 +370,7 @@ export default function AddScreen() {
       if (day) {
         setDate(parseDateISO(day.date));
         setNotes(day.notes);
-        setRivers(day.rivers);
+        setRivers(migrateRivers(day.rivers));
       } else {
         // The edit target no longer exists — it was deleted from the Log
         // tab or removed by a sync from another device. Bail out instead of
@@ -477,6 +417,46 @@ export default function AddScreen() {
     ));
   }
 
+  // Change a lap's section: migrate/pre-fill its per-section pins from history
+  // and recompute km from those pins. A manual km override persists until the
+  // user moves a pin (km is only overwritten when there's something to measure).
+  function changeLapSection(ri: number, li: number, newSection: string) {
+    setRivers((prev) => prev.map((r, i) => {
+      if (i !== ri) return r;
+      return {
+        ...r,
+        laps: r.laps.map((l, j) => {
+          if (j !== li) return l;
+          const sl = buildSectionLocations(days, r.name, l, newSection);
+          const km = autoKm(newSection, sl);
+          return {
+            ...l,
+            section: newSection,
+            sectionLocations: Object.keys(sl).length > 0 ? sl : l.sectionLocations,
+            ...(km > 0 ? { km } : {}),
+          };
+        }),
+      };
+    }));
+  }
+
+  // Write the put-in/take-out for one section, then recompute the lap's km
+  // from all its sections (pins always win, like the legacy picker did).
+  function setSectionPins(ri: number, li: number, section: string, start?: LatLng, end?: LatLng) {
+    setRivers((prev) => prev.map((r, i) => {
+      if (i !== ri) return r;
+      return {
+        ...r,
+        laps: r.laps.map((l, j) => {
+          if (j !== li) return l;
+          const sl = { ...(l.sectionLocations ?? {}), [section]: { start, end } };
+          const km = autoKm(l.section, sl);
+          return { ...l, sectionLocations: sl, ...(km > 0 ? { km } : {}) };
+        }),
+      };
+    }));
+  }
+
   function addRiver() { setRivers((prev) => [...prev, emptyRiver()]); }
   function removeRiver(ri: number) { setRivers((prev) => prev.filter((_, i) => i !== ri)); }
   function addLap(ri: number) {
@@ -484,10 +464,12 @@ export default function AddScreen() {
       if (i !== ri) return r;
       const last = r.laps[r.laps.length - 1];
       const section = last?.section ?? '';
-      const blank = { ...emptyLap(), difficulty: last?.difficulty ?? 'III', section };
-      const suggestion = suggestForLap(days, r.name, section);
-      const patch = applySuggestion(blank, section, suggestion);
-      return { ...r, laps: [...r.laps, { ...blank, ...patch }] };
+      const blank: Lap = { ...emptyLap(), difficulty: last?.difficulty ?? 'III', section };
+      const sl = buildSectionLocations(days, r.name, blank, section);
+      if (Object.keys(sl).length > 0) blank.sectionLocations = sl;
+      const km = autoKm(section, sl);
+      if (km > 0) blank.km = km;
+      return { ...r, laps: [...r.laps, blank] };
     }));
   }
   function removeLap(ri: number, li: number) { setRivers((prev) => prev.map((r, i) => i === ri ? { ...r, laps: r.laps.filter((_, j) => j !== li) } : r)); }
@@ -586,12 +568,9 @@ export default function AddScreen() {
               value={river.name}
               onChange={(name) => updateRiver(ri, { name })}
               onSelect={(name, country, difficulty, section) => {
-                const finalSection = section ?? '';
-                const currentLap = rivers[ri]?.laps[0] ?? emptyLap();
-                const suggestion = suggestForLap(days, name, finalSection);
-                const patch = applySuggestion(currentLap, finalSection, suggestion);
                 updateRiver(ri, { name, country });
-                updateLap(ri, 0, { difficulty: difficulty ?? 'III', ...patch });
+                updateLap(ri, 0, { difficulty: difficulty ?? 'III' });
+                changeLapSection(ri, 0, section ?? '');
               }}
               days={days}
               placeholder={t('add.riverNamePlaceholder')}
@@ -622,11 +601,7 @@ export default function AddScreen() {
                     <TouchableOpacity
                       key={s}
                       style={[styles.sectionBtn, isPresetActive(lap.section, s) && styles.sectionBtnActive]}
-                      onPress={() => {
-                        const section = togglePreset(lap.section ?? '', s);
-                        const suggestion = suggestForLap(days, river.name, section);
-                        updateLap(ri, li, applySuggestion(lap, section, suggestion));
-                      }}
+                      onPress={() => changeLapSection(ri, li, togglePreset(lap.section ?? '', s))}
                     >
                       <Text style={[styles.sectionBtnText, isPresetActive(lap.section, s) && styles.sectionBtnTextActive]}>
                         {t(SECTION_I18N[s] as any)}
@@ -642,11 +617,7 @@ export default function AddScreen() {
                         <TouchableOpacity
                           key={name}
                           style={[styles.customSectionBtn, active && styles.sectionBtnActive]}
-                          onPress={() => {
-                            const section = active ? '' : name;
-                            const suggestion = suggestForLap(days, river.name, section);
-                            updateLap(ri, li, applySuggestion(lap, section, suggestion));
-                          }}
+                          onPress={() => changeLapSection(ri, li, active ? '' : name)}
                         >
                           <Text style={[styles.sectionBtnText, active && styles.sectionBtnTextActive]} numberOfLines={1}>
                             {name}
@@ -659,10 +630,7 @@ export default function AddScreen() {
                 <TextInput
                   style={[styles.input, { marginTop: 6 }]}
                   value={lap.section ?? ''}
-                  onChangeText={(section) => {
-                    const suggestion = suggestForLap(days, river.name, section);
-                    updateLap(ri, li, applySuggestion(lap, section, suggestion));
-                  }}
+                  onChangeText={(section) => changeLapSection(ri, li, section)}
                   placeholder={t('add.sectionPlaceholder')}
                   placeholderTextColor={colors.textTertiary}
                   returnKeyType="done"
@@ -683,20 +651,45 @@ export default function AddScreen() {
                 </View>
 
                 <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.location')}</Text>
-                <View style={styles.locationRow}>
-                  <TouchableOpacity style={[styles.locationBtn, lap.startLocation && styles.locationBtnSet]} onPress={() => setMapPicker({ ri, li })}>
-                    <View style={[styles.locationDot, { backgroundColor: '#34c759' }]} />
-                    <Text style={[styles.locationBtnText, lap.startLocation && styles.locationBtnTextSet]}>
-                      {lap.startLocation ? t('add.startSet') : t('add.start')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.locationBtn, lap.endLocation && styles.locationBtnSet]} onPress={() => setMapPicker({ ri, li })}>
-                    <View style={[styles.locationDot, { backgroundColor: '#ff3b30' }]} />
-                    <Text style={[styles.locationBtnText, lap.endLocation && styles.locationBtnTextSet]}>
-                      {lap.endLocation ? t('add.endSet') : t('add.end')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                {sectionParts(lap.section).length === 0 ? (
+                  <View style={styles.locationRow}>
+                    <TouchableOpacity style={[styles.locationBtn, lap.startLocation && styles.locationBtnSet]} onPress={() => setMapPicker({ ri, li, section: null })}>
+                      <View style={[styles.locationDot, { backgroundColor: '#34c759' }]} />
+                      <Text style={[styles.locationBtnText, lap.startLocation && styles.locationBtnTextSet]}>
+                        {lap.startLocation ? t('add.startSet') : t('add.start')}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.locationBtn, lap.endLocation && styles.locationBtnSet]} onPress={() => setMapPicker({ ri, li, section: null })}>
+                      <View style={[styles.locationDot, { backgroundColor: '#ff3b30' }]} />
+                      <Text style={[styles.locationBtnText, lap.endLocation && styles.locationBtnTextSet]}>
+                        {lap.endLocation ? t('add.endSet') : t('add.end')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  sectionParts(lap.section).map((part) => {
+                    const loc = lap.sectionLocations?.[part];
+                    return (
+                      <View key={part} style={styles.sectionLocBlock}>
+                        <Text style={styles.sectionLocLabel}>{sectionLabel(part, t)}</Text>
+                        <View style={styles.locationRow}>
+                          <TouchableOpacity style={[styles.locationBtn, loc?.start && styles.locationBtnSet]} onPress={() => setMapPicker({ ri, li, section: part })}>
+                            <View style={[styles.locationDot, { backgroundColor: '#34c759' }]} />
+                            <Text style={[styles.locationBtnText, loc?.start && styles.locationBtnTextSet]}>
+                              {loc?.start ? t('add.startSet') : t('add.start')}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={[styles.locationBtn, loc?.end && styles.locationBtnSet]} onPress={() => setMapPicker({ ri, li, section: part })}>
+                            <View style={[styles.locationDot, { backgroundColor: '#ff3b30' }]} />
+                            <Text style={[styles.locationBtnText, loc?.end && styles.locationBtnTextSet]}>
+                              {loc?.end ? t('add.endSet') : t('add.end')}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
 
                 <View style={[styles.lapRow, { marginTop: 10 }]}>
                   {[
@@ -757,27 +750,35 @@ export default function AddScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {mapPicker !== null && (
-        <MapPicker
-          visible
-          riverName={rivers[mapPicker.ri]?.name || undefined}
-          initialStart={rivers[mapPicker.ri]?.laps[mapPicker.li]?.startLocation}
-          initialEnd={rivers[mapPicker.ri]?.laps[mapPicker.li]?.endLocation}
-          onConfirm={(start, end) => {
-            const currentRiver = rivers[mapPicker.ri];
-            const currentLap = currentRiver?.laps[mapPicker.li] ?? emptyLap();
-            const section = currentLap.section ?? '';
-            const suggestion = suggestForLap(days, currentRiver?.name ?? '', section);
-            updateLap(
-              mapPicker.ri,
-              mapPicker.li,
-              applySuggestion(currentLap, section, suggestion, { startLocation: start, endLocation: end }),
-            );
-            setMapPicker(null);
-          }}
-          onCancel={() => setMapPicker(null)}
-        />
-      )}
+      {mapPicker !== null && (() => {
+        const lap = rivers[mapPicker.ri]?.laps[mapPicker.li];
+        const sec = mapPicker.section;
+        const loc = sec === null
+          ? { start: lap?.startLocation, end: lap?.endLocation }
+          : (lap?.sectionLocations?.[sec] ?? {});
+        return (
+          <MapPicker
+            visible
+            riverName={rivers[mapPicker.ri]?.name || undefined}
+            initialStart={loc.start}
+            initialEnd={loc.end}
+            onConfirm={(start, end) => {
+              if (sec === null) {
+                // Legacy single location: pins win, recompute km from them.
+                updateLap(mapPicker.ri, mapPicker.li, {
+                  startLocation: start,
+                  endLocation: end,
+                  ...(start && end ? { km: Math.round(haversineKm(start, end) * 10) / 10 } : {}),
+                });
+              } else {
+                setSectionPins(mapPicker.ri, mapPicker.li, sec, start, end);
+              }
+              setMapPicker(null);
+            }}
+            onCancel={() => setMapPicker(null)}
+          />
+        );
+      })()}
     </SafeAreaView>
   );
 }

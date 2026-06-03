@@ -11,6 +11,7 @@ import { useApp } from '../lib/AppContext';
 import { useTheme } from '../lib/themeContext';
 import type { Colors } from '../constants/theme';
 import { spacing, radius } from '../constants/theme';
+import { sectionParts } from '../lib/sections';
 
 const DIFFICULTY_COLOR: Record<string, string> = {
   'I': '#30d158', 'II': '#34c759', 'III': '#ffd60a',
@@ -152,17 +153,38 @@ export default function MapScreen() {
     for (const day of filteredDays) {
       for (const river of day.rivers) {
         river.laps.forEach((lap, li) => {
-          if (!lap.startLocation) return;
-          const poly = lap.endLocation
-            ? [{ latitude: lap.startLocation.lat, longitude: lap.startLocation.lng }, { latitude: lap.endLocation.lat, longitude: lap.endLocation.lng }]
-            : [];
-          result.push({
-            id: `${day.id}-${river.name}-${li}`,
-            name: river.name, difficulty: lap.difficulty ?? 'III', date: day.date, section: lap.section,
-            start: { latitude: lap.startLocation.lat, longitude: lap.startLocation.lng },
-            end: lap.endLocation ? { latitude: lap.endLocation.lat, longitude: lap.endLocation.lng } : undefined,
-            polyline: poly,
-          });
+          const base = { name: river.name, difficulty: lap.difficulty ?? 'III', date: day.date };
+          // Per-section routes (new model): one route per selected section that
+          // has a put-in. Falls back to the legacy single location otherwise.
+          const sectioned = sectionParts(lap.section)
+            .map((part) => ({ part, loc: lap.sectionLocations?.[part] }))
+            .filter((x) => x.loc?.start);
+          if (sectioned.length > 0) {
+            for (const { part, loc } of sectioned) {
+              const start = loc!.start!;
+              const end = loc!.end;
+              result.push({
+                id: `${day.id}-${river.name}-${li}-${part}`,
+                ...base, section: part,
+                start: { latitude: start.lat, longitude: start.lng },
+                end: end ? { latitude: end.lat, longitude: end.lng } : undefined,
+                polyline: end
+                  ? [{ latitude: start.lat, longitude: start.lng }, { latitude: end.lat, longitude: end.lng }]
+                  : [],
+              });
+            }
+          } else if (lap.startLocation) {
+            const poly = lap.endLocation
+              ? [{ latitude: lap.startLocation.lat, longitude: lap.startLocation.lng }, { latitude: lap.endLocation.lat, longitude: lap.endLocation.lng }]
+              : [];
+            result.push({
+              id: `${day.id}-${river.name}-${li}`,
+              ...base, section: lap.section,
+              start: { latitude: lap.startLocation.lat, longitude: lap.startLocation.lng },
+              end: lap.endLocation ? { latitude: lap.endLocation.lat, longitude: lap.endLocation.lng } : undefined,
+              polyline: poly,
+            });
+          }
         });
       }
     }
