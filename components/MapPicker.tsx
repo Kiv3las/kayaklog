@@ -113,6 +113,7 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
   const [startPin, setStartPin] = useState<LatLng | undefined>(initialStart);
   const [endPin, setEndPin] = useState<LatLng | undefined>(initialEnd);
   const [locationGranted, setLocationGranted] = useState(false);
+  const [satellite, setSatellite] = useState(false);
   const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
@@ -208,6 +209,7 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
           ref={mapRef}
           style={styles.map}
           initialRegion={initialRegion}
+          mapType={satellite ? 'hybrid' : 'standard'}
           showsUserLocation={locationGranted}
           showsMyLocationButton={false}
           onPress={handleMapPress}
@@ -275,6 +277,13 @@ export default function MapPicker({ visible, riverName, initialStart, initialEnd
           )}
         </MapView>
 
+        <TouchableOpacity
+          style={[styles.locateBtn, { bottom: 92 }, satellite && { backgroundColor: colors.primary }]}
+          onPress={() => setSatellite((s) => !s)}
+          accessibilityLabel={t('map.satellite')}
+        >
+          <Ionicons name="layers" size={20} color={satellite ? '#fff' : colors.primary} />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.locateBtn} onPress={centerOnMe}>
           <Ionicons name="locate" size={22} color={colors.primary} />
         </TouchableOpacity>

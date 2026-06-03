@@ -107,6 +107,23 @@ function makeStyles(c: Colors) {
       backgroundColor: c.cardBg, borderTopWidth: 1, borderTopColor: c.border,
     },
     countText: { fontSize: 13, color: c.textTertiary, textAlign: 'center' },
+    satelliteBtn: {
+      position: 'absolute',
+      bottom: 16,
+      right: 16,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: c.cardBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    satelliteBtnActive: { backgroundColor: c.primary },
   });
 }
 
@@ -142,6 +159,7 @@ export default function MapScreen() {
   const router = useRouter();
   const currentYear = new Date().getFullYear();
   const [filter, setFilter] = useState<'year' | 'all'>('year');
+  const [satellite, setSatellite] = useState(false);
 
   const filteredDays = useMemo(() => {
     if (filter === 'year') return days.filter((d) => d.date.startsWith(`${currentYear}`));
@@ -251,7 +269,7 @@ export default function MapScreen() {
       </View>
 
       <View style={styles.mapContainer}>
-        <MapView style={styles.map} initialRegion={initialRegion}>
+        <MapView style={styles.map} initialRegion={initialRegion} mapType={satellite ? 'hybrid' : 'standard'}>
           {startPins.flatMap((pin) =>
             pin.polylines.map((poly, i) => (
               <Polyline key={`${pin.id}-poly-${i}`} coordinates={poly} strokeColor={DIFFICULTY_COLOR[pin.entries[i]?.difficulty ?? 'III'] ?? colors.primary} strokeWidth={3} />
@@ -285,6 +303,14 @@ export default function MapScreen() {
             </View>
           ))}
         </View>
+
+        <TouchableOpacity
+          style={[styles.satelliteBtn, satellite && styles.satelliteBtnActive]}
+          onPress={() => setSatellite((s) => !s)}
+          accessibilityLabel={t('map.satellite')}
+        >
+          <Ionicons name="layers" size={20} color={satellite ? '#fff' : colors.primary} />
+        </TouchableOpacity>
 
         {routes.length === 0 && (
           <View style={styles.emptyOverlay}>

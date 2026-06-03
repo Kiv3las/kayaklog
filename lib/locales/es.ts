@@ -171,6 +171,7 @@ const es = {
     title: 'Mis rutas',
     back: 'Atrás',
     all: 'Todo',
+    satellite: 'Vista satelital',
     start: 'Inicio',
     end: 'Final',
     putIn: 'Put in',

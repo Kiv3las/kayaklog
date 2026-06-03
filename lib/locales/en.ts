@@ -173,6 +173,7 @@ const en: Translations = {
     title: 'My routes',
     back: 'Back',
     all: 'All',
+    satellite: 'Satellite view',
     start: 'Start',
     end: 'End',
     putIn: 'Put in',
