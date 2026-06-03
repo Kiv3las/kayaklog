@@ -162,7 +162,7 @@ export default function AchievementsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)' as any)}>
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
           <Text style={styles.backText}>{t('settings.back')}</Text>
         </TouchableOpacity>

@@ -237,7 +237,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityLabel={t('settings.back')}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)' as any)} style={styles.backBtn} accessibilityLabel={t('settings.back')}>
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
           <Text style={styles.backText}>{t('settings.back')}</Text>
         </TouchableOpacity>
