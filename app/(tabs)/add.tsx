@@ -10,10 +10,13 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useApp } from '../../lib/AppContext';
 import { useTheme } from '../../lib/themeContext';
 import type { Colors } from '../../constants/theme';
-import { Day, River, Lap, Difficulty, LatLng, SectionLoc } from '../../lib/types';
+import { Day, River, Lap, Difficulty, LatLng, SectionLoc, WaterLevel } from '../../lib/types';
 import { isoFromDate, parseDateISO, formatDisplayDate } from '../../lib/dates';
 import { haversineKm } from '../../lib/geo';
 import { normalizeSection, isPresetCombo, sectionParts } from '../../lib/sections';
+import { WATER_LEVELS, WATER_LEVEL_COLOR, WATER_LEVEL_I18N } from '../../lib/water';
+import { formatTime } from '../../lib/stats';
+import { countryByCode } from '../../lib/countries';
 import { addFormSignal } from '../../lib/addFormSignal';
 import { spacing, radius } from '../../constants/theme';
 import { refreshNotificationSchedule } from '../../lib/notifications';
@@ -23,6 +26,9 @@ import CountryPicker from '../../components/CountryPicker';
 import MapPicker from '../../components/MapPicker';
 
 const DIFFICULTIES: Difficulty[] = ['I', 'II', 'III', 'IV', 'V', 'VI'];
+const DIFFICULTY_COLOR: Record<Difficulty, string> = {
+  I: '#30d158', II: '#34c759', III: '#ffd60a', IV: '#ff9f0a', V: '#ff453a', VI: '#bf5af2',
+};
 const SECTION_PRESETS = ['Alto', 'Medio', 'Bajo', 'Todo'];
 const SECTION_PRESET_PARTS = ['Alto', 'Medio', 'Bajo'] as const;
 const SECTION_I18N: Record<string, string> = {
@@ -280,7 +286,9 @@ function makeStyles(c: Colors) {
       alignItems: 'center',
       marginBottom: 10,
     },
-    riverCardTitle: { fontSize: 15, fontWeight: '700', color: c.textPrimary },
+    riverCardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
+    riverCardFlag: { fontSize: 20 },
+    riverCardTitle: { fontSize: 15, fontWeight: '700', color: c.textPrimary, flexShrink: 1 },
     lapCard: {
       backgroundColor: c.bg,
       borderRadius: radius.sm,
@@ -328,6 +336,17 @@ function makeStyles(c: Colors) {
       marginBottom: spacing.md,
     },
     addRiverText: { color: c.primary, fontSize: 15, fontWeight: '600' },
+    daySummary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      marginBottom: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: `${c.primary}14`,
+    },
+    daySummaryText: { fontSize: 14, fontWeight: '700', color: c.primary },
     saveBtn: { backgroundColor: c.primary, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center' },
     saveBtnDisabled: { backgroundColor: c.border },
     saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
@@ -483,6 +502,12 @@ export default function AddScreen() {
     }));
   }
 
+  const dayTotals = useMemo(() => {
+    let laps = 0, km = 0, minutes = 0;
+    for (const r of rivers) for (const l of r.laps) { laps++; km += l.km; minutes += l.hours * 60 + l.minutes; }
+    return { laps, km: Math.round(km * 10) / 10, minutes };
+  }, [rivers]);
+
   const canSave = rivers.length > 0 && rivers.every((r) => r.name.trim().length > 0);
 
   // Leave the form behind cleanly. If we were editing, strip editId from the
@@ -555,7 +580,12 @@ export default function AddScreen() {
           return (
           <View key={ri} style={styles.riverCard}>
             <View style={styles.riverCardHeader}>
-              <Text style={styles.riverCardTitle}>{t('add.river', { n: ri + 1 })}</Text>
+              <View style={styles.riverCardTitleRow}>
+                <Text style={styles.riverCardFlag}>{countryByCode[river.country]?.flag ?? '🏞️'}</Text>
+                <Text style={styles.riverCardTitle} numberOfLines={1}>
+                  {river.name.trim() || t('add.river', { n: ri + 1 })}
+                </Text>
+              </View>
               {rivers.length > 1 && (
                 <TouchableOpacity onPress={() => removeRiver(ri)} accessibilityLabel={t('add.removeRiver')}>
                   <Ionicons name="close-circle" size={20} color={colors.danger} />
@@ -638,17 +668,51 @@ export default function AddScreen() {
 
                 <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.class')}</Text>
                 <View style={styles.diffRow}>
-                  {DIFFICULTIES.map((d) => (
-                    <TouchableOpacity
-                      key={d}
-                      style={[styles.diffBtn, (lap.difficulty ?? 'III') === d && styles.diffBtnActive]}
-                      onPress={() => updateLap(ri, li, { difficulty: d })}
-                      accessibilityLabel={t('rivers.class', { level: d })}
-                    >
-                      <Text style={[styles.diffBtnText, (lap.difficulty ?? 'III') === d && styles.diffBtnTextActive]}>{d}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {DIFFICULTIES.map((d) => {
+                    const active = (lap.difficulty ?? 'III') === d;
+                    const color = DIFFICULTY_COLOR[d];
+                    return (
+                      <TouchableOpacity
+                        key={d}
+                        style={[styles.diffBtn, active && { borderColor: color, backgroundColor: color }]}
+                        onPress={() => updateLap(ri, li, { difficulty: d })}
+                        accessibilityLabel={t('rivers.class', { level: d })}
+                      >
+                        <Text style={[styles.diffBtnText, active && styles.diffBtnTextActive]}>{d}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
+
+                <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.waterLevel')}</Text>
+                <View style={styles.sectionRow}>
+                  {WATER_LEVELS.map((w) => {
+                    const active = lap.waterLevel === w;
+                    const color = WATER_LEVEL_COLOR[w];
+                    return (
+                      <TouchableOpacity
+                        key={w}
+                        style={[styles.sectionBtn, active && { borderColor: color, backgroundColor: `${color}22` }]}
+                        onPress={() => updateLap(ri, li, { waterLevel: active ? undefined : w })}
+                      >
+                        <Text style={[styles.sectionBtnText, active && { color }]} numberOfLines={1}>
+                          {t(WATER_LEVEL_I18N[w] as any)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <TextInput
+                  style={[styles.input, { marginTop: 6 }]}
+                  value={lap.flow ? String(lap.flow) : ''}
+                  onChangeText={(v) => {
+                    const n = Number(v.replace(',', '.'));
+                    updateLap(ri, li, { flow: Number.isFinite(n) && n > 0 ? n : undefined });
+                  }}
+                  placeholder={t('add.flowOptional')}
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="decimal-pad"
+                />
 
                 <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.location')}</Text>
                 {sectionParts(lap.section).length === 0 ? (
@@ -744,6 +808,15 @@ export default function AddScreen() {
           <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
           <Text style={styles.addRiverText}>{t('add.addRiver')}</Text>
         </TouchableOpacity>
+
+        {(dayTotals.km > 0 || dayTotals.minutes > 0) && (
+          <View style={styles.daySummary}>
+            <Ionicons name="water" size={16} color={colors.primary} />
+            <Text style={styles.daySummaryText}>
+              {t('add.daySummary', { laps: dayTotals.laps, km: dayTotals.km, time: formatTime(dayTotals.minutes) })}
+            </Text>
+          </View>
+        )}
 
         <TouchableOpacity style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]} onPress={handleSave} disabled={!canSave}>
           <Text style={styles.saveBtnText}>{isEdit ? t('add.saveChanges') : t('add.save')}</Text>

@@ -150,6 +150,7 @@ function RootContent() {
         <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="map" options={{ headerShown: false }} />
         <Stack.Screen name="achievements" options={{ headerShown: false }} />
+        <Stack.Screen name="river" options={{ headerShown: false }} />
       </Stack>
     </AppProvider>
   );

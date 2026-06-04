@@ -8,6 +8,8 @@ export interface SectionLoc {
   end?: LatLng;
 }
 
+export type WaterLevel = 'bajo' | 'medio' | 'alto' | 'crecida';
+
 export interface Lap {
   km: number;
   hours: number;
@@ -16,6 +18,10 @@ export interface Lap {
   note: string;
   difficulty?: Difficulty;
   section?: string;
+  // Water level for this lap. `waterLevel` is the ordinal (comparable for
+  // "most/least water"); `flow` is an optional precise reading in m³/s.
+  waterLevel?: WaterLevel;
+  flow?: number;
   // Legacy single put-in/take-out — kept for backward compatibility with
   // laps logged before per-section locations existed.
   startLocation?: LatLng;

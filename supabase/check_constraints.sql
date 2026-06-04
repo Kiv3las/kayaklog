@@ -61,6 +61,8 @@ AS $$
          OR (l->>'hours')::int       NOT BETWEEN 0 AND 48
          OR (l->>'minutes')::int     NOT BETWEEN 0 AND 59
          OR (l ? 'difficulty' AND l->>'difficulty' NOT IN ('I','II','III','IV','V','VI'))
+         OR (l ? 'waterLevel' AND l->>'waterLevel' NOT IN ('bajo','medio','alto','crecida'))
+         OR (l ? 'flow' AND (l->>'flow')::numeric < 0)
     )
   END;
 $$;

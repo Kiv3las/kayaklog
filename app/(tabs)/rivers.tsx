@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, SectionList, TouchableOpacity, SafeAreaView,
 } from 'react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../../lib/AppContext';
@@ -132,6 +133,7 @@ export default function RiversScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { days } = useApp();
+  const router = useRouter();
   const sheetRef = useRef<BottomSheet>(null);
   const [filter, setFilter] = useState<FilterType>({ kind: 'all' });
 
@@ -164,7 +166,14 @@ export default function RiversScreen() {
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => <RiversSectionHeader section={section} styles={styles} />}
-          renderItem={({ item }) => <RiverRow river={item} styles={styles} colors={colors} />}
+          renderItem={({ item }) => (
+            <RiverRow
+              river={item}
+              styles={styles}
+              colors={colors}
+              onPress={() => router.push({ pathname: '/river', params: { name: item.name, country: item.country } } as any)}
+            />
+          )}
         />
       )}
 
@@ -188,15 +197,16 @@ function RiversSectionHeader({ section, styles }: { section: CountrySection; sty
   );
 }
 
-function RiverRow({ river, styles, colors }: { river: RiverStat; styles: ReturnType<typeof makeStyles>; colors: Colors }) {
+function RiverRow({ river, styles, colors, onPress }: { river: RiverStat; styles: ReturnType<typeof makeStyles>; colors: Colors; onPress: () => void }) {
   const { t } = useTranslation();
   return (
-    <View style={styles.riverCard}>
+    <TouchableOpacity style={styles.riverCard} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.riverTop}>
         <Text style={styles.riverName}>{river.name}</Text>
         <View style={styles.diffBadge}>
           <Text style={styles.diffText}>{t('rivers.class', { level: river.difficulty })}</Text>
         </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={{ marginLeft: 4 }} />
       </View>
       {river.sections.length > 0 && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
@@ -213,7 +223,7 @@ function RiverRow({ river, styles, colors }: { river: RiverStat; styles: ReturnT
         <StatPill icon="repeat-outline" label={`${river.laps} lap${river.laps !== 1 ? 's' : ''}`} styles={styles} colors={colors} />
         <StatPill icon="time-outline" label={formatTime(river.timeMinutes)} styles={styles} colors={colors} />
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
