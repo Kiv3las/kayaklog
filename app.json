@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "cl.ivelic.kayaklog",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
         "UIBackgroundModes": [],
         "ITSAppUsesNonExemptEncryption": false
