@@ -1,0 +1,26 @@
+# Config parcial de auth gestionada como código (`supabase config push`).
+# OJO: el push compara contra los defaults del CLI para toda clave no
+# declarada — las secciones [auth.mfa.totp] y [auth.email] fijan los valores
+# remotos existentes para que NO cambien.
+project_id = "kayaklog"
+
+[auth]
+# Página de aterrizaje del link de confirmación de email (GitHub Pages).
+# Antes era http://localhost:3000 → el 404 que veían los usuarios al
+# confirmar su cuenta.
+site_url = "https://kiv3las.github.io/kayaklog/confirmed.html"
+# Redirects permitidos: la página de confirmación y el deep link del flujo
+# de recuperación de contraseña (kayaklog://auth/reset — NO quitar).
+additional_redirect_urls = [
+  "https://kiv3las.github.io/kayaklog/confirmed.html",
+  "kayaklog://auth/reset",
+]
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.email]
+enable_confirmations = true
+max_frequency = "1m0s"
+otp_length = 8

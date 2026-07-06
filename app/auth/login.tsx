@@ -112,7 +112,13 @@ export default function LoginScreen() {
       } else {
         const { data, error } = await supabase.auth.signUp({
           email: trimmedEmail, password,
-          options: { data: { name: name.trim() } },
+          options: {
+            data: { name: name.trim() },
+            // Página de aterrizaje del link de confirmación (GitHub Pages).
+            // Sin esto el correo redirige al Site URL del proyecto, que
+            // históricamente apuntaba a una página inexistente (404).
+            emailRedirectTo: 'https://kiv3las.github.io/kayaklog/confirmed.html',
+          },
         });
         if (error) {
           setIsError(true); setMessage(error.message);
