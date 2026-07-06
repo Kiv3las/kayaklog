@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { createClient } from '@supabase/supabase-js';
 
@@ -22,3 +23,17 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: false,
   },
 });
+
+// En React Native la librería no puede detectar si la app está en primer
+// plano, así que el temporizador de refresh del token hay que manejarlo a
+// mano (documentación oficial de Supabase para RN). Sin esto el token vence
+// con la app abierta y, al abrir la app sin conexión, la sesión aparece
+// muerta y el usuario cae al login — el bug offline de la v1.
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') {
+    supabase.auth.startAutoRefresh();
+  } else {
+    supabase.auth.stopAutoRefresh();
+  }
+});
+supabase.auth.startAutoRefresh();

@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { Day, Settings } from './types';
-import { loadDays, saveDays, loadSettings, saveSettings, clearUserData } from './storage';
+import {
+  loadDays, saveDays, loadSettings, saveSettings, clearUserData,
+  loadPendingOps, savePendingOps, loadLastUser, saveLastUser,
+} from './storage';
 import { refreshNotificationSchedule } from './notifications';
 import { supabase } from './supabase';
 import {
@@ -31,6 +34,41 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+// Registran el resultado de una escritura remota en la cola offline: si
+// falló queda pendiente para el próximo sync; si llegó, se saca de la cola
+// (cubre el caso "editado offline y re-editado ya con conexión").
+async function markUpsertResult(userId: string, dayId: number, ok: boolean): Promise<void> {
+  try {
+    const p = await loadPendingOps(userId);
+    const queued = p.upserts.includes(dayId);
+    if (ok && queued) p.upserts = p.upserts.filter((i) => i !== dayId);
+    else if (!ok && !queued) p.upserts.push(dayId);
+    else return;
+    await savePendingOps(p, userId);
+  } catch { /* best-effort */ }
+}
+
+async function markDeleteResult(userId: string, dayId: number, ok: boolean): Promise<void> {
+  try {
+    const p = await loadPendingOps(userId);
+    // Un borrado anula cualquier edición pendiente del mismo día.
+    p.upserts = p.upserts.filter((i) => i !== dayId);
+    const queued = p.deletes.includes(dayId);
+    if (ok && queued) p.deletes = p.deletes.filter((i) => i !== dayId);
+    else if (!ok && !queued) p.deletes.push(dayId);
+    await savePendingOps(p, userId);
+  } catch { /* best-effort */ }
+}
+
+async function markSettingsResult(userId: string, ok: boolean): Promise<void> {
+  try {
+    const p = await loadPendingOps(userId);
+    if (p.settingsDirty === !ok) return;
+    p.settingsDirty = !ok;
+    await savePendingOps(p, userId);
+  } catch { /* best-effort */ }
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [days, setDays] = useState<Day[]>([]);
   const [settings, setSettings] = useState<Settings>({ notifEnabled: false, notifTime: '21:00' });
@@ -53,6 +91,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // 2. Background sync from Supabase (source of truth)
     setIsSyncing(true);
     try {
+      // 2a. Drenar la cola offline ANTES de leer el remoto: así el fetch ya
+      // trae las ediciones/borrados hechos sin conexión y el merge no los
+      // pisa con la versión antigua del servidor.
+      const pending = await loadPendingOps(userId);
+      if (pending.upserts.length > 0) {
+        const toPush = localDays.filter((d) => pending.upserts.includes(d.id));
+        if (await pushAllDays(toPush, userId)) pending.upserts = [];
+      }
+      if (pending.deletes.length > 0) {
+        const results = await Promise.all(pending.deletes.map((id) => remoteDeleteDay(id, userId)));
+        pending.deletes = pending.deletes.filter((_, i) => !results[i]);
+      }
+      if (pending.settingsDirty) {
+        if (await upsertSettings(localSettings, userId)) pending.settingsDirty = false;
+      }
+      await savePendingOps(pending, userId);
+      const stillPendingUpserts = new Set(pending.upserts);
+      const stillPendingDeletes = new Set(pending.deletes);
+
       const [remoteDays, remoteSettings] = await Promise.all([
         fetchDaysFromSupabase(userId),
         fetchSettings(userId),
@@ -61,23 +118,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Merge instead of overwriting: any day in the local cache whose id is
       // NOT in the remote set was added/edited while offline and never made
       // it to the server. Overwriting would silently lose those rows. Keep
-      // them and push them up now that we're online again.
+      // them and push them up now that we're online again. Days still in the
+      // pending queue (push failed above) win over their remote version, and
+      // pending deletes are filtered out of the remote set.
       if (remoteDays.length > 0) {
         const remoteIds = new Set(remoteDays.map((d) => d.id));
-        const pendingLocal = localDays.filter((d) => !remoteIds.has(d.id));
-        const merged = [...remoteDays, ...pendingLocal]
+        const remoteKept = remoteDays.filter(
+          (d) => !stillPendingDeletes.has(d.id) && !stillPendingUpserts.has(d.id),
+        );
+        const localWins = localDays.filter(
+          (d) => stillPendingUpserts.has(d.id) || (!remoteIds.has(d.id) && !stillPendingDeletes.has(d.id)),
+        );
+        const newToRemote = localDays.filter((d) => !remoteIds.has(d.id) && !stillPendingDeletes.has(d.id));
+        const merged = [...remoteKept, ...localWins]
           .sort((a, b) => b.date.localeCompare(a.date));
         setDays(merged);
         await saveDays(merged, userId);
-        if (pendingLocal.length > 0) {
-          await pushAllDays(pendingLocal, userId);
+        if (newToRemote.length > 0) {
+          await pushAllDays(newToRemote, userId);
         }
       } else if (localDays.length > 0) {
         // First login or empty remote: push the whole local cache up.
         await pushAllDays(localDays, userId);
       }
 
-      if (remoteSettings) {
+      // Settings editados offline (aún en cola) no se pisan con los remotos.
+      if (remoteSettings && !pending.settingsDirty) {
         setSettings(remoteSettings);
         await saveSettings(remoteSettings, userId);
       }
@@ -90,6 +156,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let sessionUserSeen = false;
+
+    // ARRANQUE OFFLINE: si hay un usuario conocido en el dispositivo, cargar
+    // su caché local de inmediato sin esperar a supabase-js. Cuando el token
+    // está vencido y no hay red, la librería se queda reintentando el refresh
+    // y el evento INITIAL_SESSION tarda (o llega con sesión nula) — sin este
+    // arranque la app quedaba pegada en el splash (bug offline de la v1).
+    loadLastUser().then((last) => {
+      if (!mounted || sessionUserSeen || !last) return;
+      // Stub mínimo: la app solo usa id y user_metadata.name. La sesión real
+      // lo reemplaza apenas supabase-js logre restaurarla.
+      setUser({ id: last.id, user_metadata: { name: last.name } } as unknown as User);
+      void loadUserData(last.id);
+    });
 
     // Listen for auth state changes (SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED,
     // INITIAL_SESSION, PASSWORD_RECOVERY). supabase-js v2 fires
@@ -106,8 +186,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
       if (currentUser) {
+        sessionUserSeen = true;
+        setUser(currentUser);
+        void saveLastUser({ id: currentUser.id, name: currentUser.user_metadata?.name });
         await loadUserData(currentUser.id);
         if (event === 'INITIAL_SESSION') {
           // Validate the cached JWT against the server in the background.
@@ -121,9 +203,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           });
         }
       } else {
-        setDays([]);
-        setSettings({ notifEnabled: false, notifTime: '21:00' });
-        setIsLoading(false);
+        // Sesión nula: solo desloguear si es un cierre de sesión real. Una
+        // INITIAL_SESSION nula con usuario conocido en el dispositivo es el
+        // caso "offline con token vencido" — mantener el arranque offline.
+        const last = event === 'SIGNED_OUT' ? null : await loadLastUser();
+        if (!last) {
+          sessionUserSeen = false;
+          setUser(null);
+          setDays([]);
+          setSettings({ notifEnabled: false, notifTime: '21:00' });
+          setIsLoading(false);
+        }
       }
     });
 
@@ -137,7 +227,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       void saveDays(next, userId);
       return next;
     });
-    if (user) void upsertDay(day, user.id);
+    if (user) {
+      const uid = user.id;
+      void upsertDay(day, uid).then((ok) => markUpsertResult(uid, day.id, ok));
+    }
   }, [user]);
 
   const updateDay = useCallback(async (day: Day) => {
@@ -149,7 +242,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       void saveDays(next, userId);
       return next;
     });
-    if (user) void upsertDay(day, user.id);
+    if (user) {
+      const uid = user.id;
+      void upsertDay(day, uid).then((ok) => markUpsertResult(uid, day.id, ok));
+    }
   }, [user]);
 
   const deleteDay = useCallback(async (id: number) => {
@@ -160,7 +256,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       void refreshNotificationSchedule(settings, next);
       return next;
     });
-    if (user) void remoteDeleteDay(id, user.id);
+    if (user) {
+      const uid = user.id;
+      void remoteDeleteDay(id, uid).then((ok) => markDeleteResult(uid, id, ok));
+    }
   }, [user, settings]);
 
   const updateSettings = useCallback(async (newSettings: Settings) => {
@@ -168,7 +267,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSettings(newSettings);
     await saveSettings(newSettings, userId);
     await refreshNotificationSchedule(newSettings, days);
-    if (user) void upsertSettings(newSettings, user.id);
+    if (user) {
+      const uid = user.id;
+      void upsertSettings(newSettings, uid).then((ok) => markSettingsResult(uid, ok));
+    }
   }, [user, days]);
 
   const updateName = useCallback(async (name: string): Promise<boolean> => {

@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import { AppProvider } from '../lib/AppContext';
 import { ThemeProvider, useTheme } from '../lib/themeContext';
 import { supabase } from '../lib/supabase';
+import { loadLastUser } from '../lib/storage';
 import { initLanguage } from '../lib/i18n';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -99,6 +100,10 @@ function PasswordResetLinkHandler() {
 function RootContent() {
   const { colors } = useTheme();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  // Último usuario conocido en el dispositivo (AsyncStorage). Permite entrar
+  // sin esperar a getSession(): con el token vencido y sin red, supabase-js
+  // se queda reintentando el refresh y el splash quedaba eterno (bug v1).
+  const [hasLastUser, setHasLastUser] = useState<boolean | undefined>(undefined);
   const [i18nReady, setI18nReady] = useState(false);
 
   useEffect(() => {
@@ -107,6 +112,10 @@ function RootContent() {
 
   useEffect(() => {
     let mounted = true;
+
+    loadLastUser().then((last) => {
+      if (mounted) setHasLastUser(!!last);
+    });
 
     // Resolve the splash state from the locally cached session — never block
     // on the network so the app opens immediately when offline.
@@ -126,13 +135,28 @@ function RootContent() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
-      if (mounted) setSession(s);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      if (!mounted) return;
+      setSession(s);
+      if (s?.user) setHasLastUser(true);
+      else if (event === 'SIGNED_OUT') setHasLastUser(false);
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
-  if (session === undefined || !i18nReady) {
+  // Sesión efectiva para el gate: la real si existe; si no, el usuario
+  // conocido del dispositivo cuenta como sesión (arranque offline). Un
+  // SIGNED_OUT real limpia hasLastUser y manda al login. Mientras ninguna
+  // de las dos fuentes haya resuelto, splash.
+  const effectiveSession: Session | null | undefined =
+    session
+    ?? (hasLastUser
+      ? ({ offline: true } as unknown as Session)
+      : hasLastUser === undefined || session === undefined
+        ? undefined
+        : null);
+
+  if (effectiveSession === undefined || !i18nReady) {
     return (
       <View style={[styles.splash, { backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -142,7 +166,7 @@ function RootContent() {
 
   return (
     <AppProvider>
-      <AuthGate session={session} />
+      <AuthGate session={effectiveSession} />
       <PasswordResetLinkHandler />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
