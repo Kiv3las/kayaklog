@@ -1,8 +1,10 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Dimensions,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Dimensions, RefreshControl,
 } from 'react-native';
 import ConfettiCannon from 'react-native-confetti-cannon';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +22,8 @@ import StreakWidget from '../../components/StreakWidget';
 import GearButton from '../../components/GearButton';
 import PaddleIcon from '../../components/PaddleIcon';
 import ShareCard from '../../components/ShareCard';
+import FlowsCarousel from '../../components/FlowsCarousel';
+import PressableScale from '../../components/PressableScale';
 
 const { width } = Dimensions.get('window');
 
@@ -38,10 +42,10 @@ function makeStyles(c: Colors) {
     greeting: { fontSize: 22, fontWeight: '800', color: c.textPrimary },
     subtitle: { fontSize: 14, color: c.textSecondary, marginTop: 2 },
     seasonCard: {
-      backgroundColor: c.primary,
       borderRadius: radius.lg,
       padding: spacing.md,
       marginBottom: spacing.md,
+      overflow: 'hidden',
     },
     seasonHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
     seasonTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
@@ -139,6 +143,15 @@ export default function InicioScreen() {
   const lastDay = days[0];
   const shareRef = useRef<View>(null);
 
+  // Pull-to-refresh: recarga los caudales (el resto del home es local/sync).
+  const [refreshing, setRefreshing] = useState(false);
+  const [flowsToken, setFlowsToken] = useState(0);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setFlowsToken((n) => n + 1);
+  }, []);
+  const onFlowsLoaded = useCallback(() => setRefreshing(false), []);
+
   if (isLoading) return <View style={styles.loading}><Text>{t('home.loading')}</Text></View>;
 
   return (
@@ -152,7 +165,11 @@ export default function InicioScreen() {
           colors={['#0a84ff', '#ffb800', '#ff9500', '#ff3b30', '#34c759', '#a855f7']}
         />
       )}
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      >
         <View style={styles.header}>
           <View>
             <View style={styles.greetingRow}>
@@ -168,45 +185,56 @@ export default function InicioScreen() {
           <GearButton />
         </View>
 
+        <FlowsCarousel refreshToken={flowsToken} onLoaded={onFlowsLoaded} />
+
         <StreakWidget days={days} />
 
-        <View style={styles.seasonCard}>
-          <View style={styles.seasonHeader}>
-            <Text style={styles.seasonTitle}>{t('home.season', { year: currentYear })}</Text>
-            {yearStats.days > 0 && (
-              <TouchableOpacity
-                style={styles.shareBtn}
-                onPress={() => shareViewAsImage(shareRef)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="share-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-            )}
-          </View>
-          <View style={styles.statsGrid}>
-            <StatItem label={t('home.km')} value={`${yearStats.km}`} icon="speedometer-outline" />
-            <StatItem label={t('home.laps')} value={`${yearStats.laps}`} icon="repeat-outline" />
-            <StatItem label={t('home.time')} value={formatTime(yearStats.timeMinutes)} icon="time-outline" />
-            <StatItem label={t('home.rivers')} value={`${yearStats.rivers}`} icon="water-outline" />
-            <StatItem label={t('home.countries')} value={`${yearStats.countries}`} icon="globe-outline" />
-            <StatItem label={t('home.days')} value={`${yearStats.days}`} icon="calendar-outline" />
-          </View>
-        </View>
+        <Animated.View entering={FadeInDown.duration(400).delay(80)}>
+          <LinearGradient
+            colors={[colors.primary, colors.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.seasonCard}
+          >
+            <View style={styles.seasonHeader}>
+              <Text style={styles.seasonTitle}>{t('home.season', { year: currentYear })}</Text>
+              {yearStats.days > 0 && (
+                <TouchableOpacity
+                  style={styles.shareBtn}
+                  onPress={() => shareViewAsImage(shareRef)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="share-outline" size={20} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.statsGrid}>
+              <StatItem label={t('home.km')} value={`${yearStats.km}`} icon="speedometer-outline" />
+              <StatItem label={t('home.laps')} value={`${yearStats.laps}`} icon="repeat-outline" />
+              <StatItem label={t('home.time')} value={formatTime(yearStats.timeMinutes)} icon="time-outline" />
+              <StatItem label={t('home.rivers')} value={`${yearStats.rivers}`} icon="water-outline" />
+              <StatItem label={t('home.countries')} value={`${yearStats.countries}`} icon="globe-outline" />
+              <StatItem label={t('home.days')} value={`${yearStats.days}`} icon="calendar-outline" />
+            </View>
+          </LinearGradient>
+        </Animated.View>
 
-        <TouchableOpacity style={styles.achCard} onPress={() => router.push('/achievements' as any)} activeOpacity={0.85}>
-          <View style={styles.achIcon}>
-            <Ionicons name="trophy" size={20} color={colors.starGold} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.achTitle}>{t('achievements.homeCard')}</Text>
-            <Text style={styles.achSub}>{t('achievements.unlocked', { count: ach.unlockedCount, total: ach.total })}</Text>
-          </View>
-          <Text style={styles.achCount}>{ach.unlockedCount}/{ach.total}</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-        </TouchableOpacity>
+        <Animated.View entering={FadeInDown.duration(400).delay(140)}>
+          <PressableScale style={styles.achCard} onPress={() => router.push('/achievements' as any)}>
+            <View style={styles.achIcon}>
+              <Ionicons name="trophy" size={20} color={colors.starGold} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.achTitle}>{t('achievements.homeCard')}</Text>
+              <Text style={styles.achSub}>{t('achievements.unlocked', { count: ach.unlockedCount, total: ach.total })}</Text>
+            </View>
+            <Text style={styles.achCount}>{ach.unlockedCount}/{ach.total}</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+          </PressableScale>
+        </Animated.View>
 
         {lastDay && (
-          <View style={styles.card}>
+          <Animated.View entering={FadeInDown.duration(400).delay(200)} style={styles.card}>
             <Text style={styles.cardTitle}>{t('home.lastTrip')}</Text>
             <Text style={styles.lastDate}>{formatDisplayDate(lastDay.date)}</Text>
             {lastDay.rivers.map((r, i) => {
@@ -217,23 +245,23 @@ export default function InicioScreen() {
                 </Text>
               );
             })}
-          </View>
+          </Animated.View>
         )}
 
-        <View style={styles.actionsRow}>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.primary }]} onPress={() => router.push('/(tabs)/add')}>
+        <Animated.View entering={FadeInDown.duration(400).delay(260)} style={styles.actionsRow}>
+          <PressableScale containerStyle={{ flex: 1 }} style={[styles.actionBtn, { backgroundColor: colors.primary }]} onPress={() => router.push('/(tabs)/add')}>
             <Ionicons name="add-circle-outline" size={20} color="#fff" />
             <Text style={styles.actionText}>{t('home.newDay')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border }]} onPress={() => router.push('/(tabs)/stats')}>
+          </PressableScale>
+          <PressableScale containerStyle={{ flex: 1 }} style={[styles.actionBtn, { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border }]} onPress={() => router.push('/(tabs)/stats')}>
             <Ionicons name="bar-chart-outline" size={20} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.primary }]}>{t('home.stats')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border }]} onPress={() => router.push('/map' as any)}>
+          </PressableScale>
+          <PressableScale containerStyle={{ flex: 1 }} style={[styles.actionBtn, { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border }]} onPress={() => router.push('/map' as any)}>
             <Ionicons name="map-outline" size={20} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.primary }]}>{t('home.myRoutes')}</Text>
-          </TouchableOpacity>
-        </View>
+          </PressableScale>
+        </Animated.View>
       </ScrollView>
 
       <ShareCard

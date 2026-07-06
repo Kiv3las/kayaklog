@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView,
 } from 'react-native';
@@ -14,7 +14,10 @@ import { formatTime } from '../lib/stats';
 import { formatDisplayDate } from '../lib/dates';
 import { countryByCode } from '../lib/countries';
 import { WATER_LEVEL_COLOR, WATER_LEVEL_I18N, waterRank } from '../lib/water';
+import { StationCurrent, fetchStationsWithLatest, matchStationForRiver, classifyFlow } from '../lib/flows';
 import StarsDisplay from '../components/StarsDisplay';
+import PressableScale from '../components/PressableScale';
+import { timeAgoLabel } from '../components/FlowsBoard';
 
 const DIFFICULTY_COLOR: Record<Difficulty, string> = {
   I: '#30d158', II: '#34c759', III: '#ffd60a', IV: '#ff9f0a', V: '#ff453a', VI: '#bf5af2',
@@ -37,6 +40,19 @@ function makeStyles(c: Colors) {
     headerFlag: { fontSize: 18 },
     headerTitle: { fontSize: 17, fontWeight: '700', color: c.textPrimary, flexShrink: 1 },
     scroll: { padding: spacing.md, paddingBottom: 32 },
+
+    flowNowCard: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      backgroundColor: c.cardBg, borderRadius: radius.md, padding: spacing.md,
+      marginBottom: spacing.md, borderWidth: 1, borderColor: c.border,
+    },
+    flowNowIcon: {
+      width: 40, height: 40, borderRadius: 20,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    flowNowLabel: { fontSize: 11, color: c.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5 },
+    flowNowValue: { fontSize: 17, fontWeight: '800', color: c.textPrimary, marginTop: 1 },
+    flowNowUpdated: { fontSize: 11, color: c.textTertiary, marginTop: 1 },
 
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md },
     statCard: {
@@ -99,6 +115,17 @@ export default function RiverDetailScreen() {
   const { days } = useApp();
   const { name = '', country = '' } = useLocalSearchParams<{ name?: string; country?: string }>();
   const [sort, setSort] = useState<'date' | 'water'>('date');
+
+  // Si este río coincide con una estación DGA, mostramos su caudal actual.
+  const [flowMatch, setFlowMatch] = useState<StationCurrent | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    if (country !== 'CL') return; // estaciones DGA: solo ríos de Chile
+    fetchStationsWithLatest()
+      .then((items) => { if (mounted) setFlowMatch(matchStationForRiver(items, name)); })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [name, country]);
 
   const flag = countryByCode[country]?.flag ?? '🏞️';
 
@@ -174,6 +201,16 @@ export default function RiverDetailScreen() {
           <Text style={styles.empty}>{t('riverDetail.empty')}</Text>
         ) : (
           <>
+            {flowMatch?.latest && (
+              <FlowNowCard
+                match={flowMatch}
+                styles={styles}
+                colors={colors}
+                t={t}
+                onPress={() => router.push({ pathname: '/flow-station', params: { station: flowMatch.station.code } } as any)}
+              />
+            )}
+
             <View style={styles.grid}>
               <Stat value={`${stats.km}`} label={t('riverDetail.km')} styles={styles} />
               <Stat value={`${stats.laps}`} label={t('riverDetail.laps')} styles={styles} />
@@ -211,6 +248,35 @@ export default function RiverDetailScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function FlowNowCard({ match, styles, colors, t, onPress }: {
+  match: StationCurrent;
+  styles: ReturnType<typeof makeStyles>;
+  colors: Colors;
+  t: (k: any, o?: any) => string;
+  onPress: () => void;
+}) {
+  const { station, latest } = match;
+  if (!latest) return null;
+  const level = classifyFlow(station, latest.flow);
+  const levelColor = level ? WATER_LEVEL_COLOR[level] : colors.primary;
+  return (
+    <PressableScale style={styles.flowNowCard} onPress={onPress}>
+      <View style={[styles.flowNowIcon, { backgroundColor: `${levelColor}22` }]}>
+        <Ionicons name="water" size={18} color={levelColor} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.flowNowLabel}>{t('flows.riverNow')}</Text>
+        <Text style={styles.flowNowValue}>
+          {Math.round(latest.flow)} m³/s
+          {level ? <Text style={{ color: levelColor }}>  ·  {t(WATER_LEVEL_I18N[level])}</Text> : null}
+        </Text>
+        <Text style={styles.flowNowUpdated}>{timeAgoLabel(t, latest.ts)}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+    </PressableScale>
   );
 }
 

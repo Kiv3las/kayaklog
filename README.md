@@ -74,6 +74,27 @@ npx expo start
 
 Scan the QR code with **Expo Go** (SDK 54).
 
+## Environments
+
+Development and production use **separate Supabase projects** so local work
+can never touch real user data:
+
+| Environment | Supabase project | Where the app gets its config |
+|---|---|---|
+| Local development | `kayaklog-dev` (`zphpeymhykhegeipenah`) | `.env` (gitignored) |
+| Production (App Store) | `kayaklog` (`cqgglagfitznuwnpspma`) | EAS env vars, `production` environment |
+
+Rules of thumb:
+
+- `.env` must always point at **kayaklog-dev**. Never paste production keys there.
+- Production env vars live in EAS (`npx eas-cli env:list --environment production`);
+  `eas build --profile production` picks them up automatically.
+- Schema changes go to `kayaklog-dev` first. Apply them to production only when
+  shipping, and keep them **backward compatible** (additive) — users on older
+  app versions keep talking to the same production database.
+- The `delete-account` edge function is deployed to both projects; deploy
+  updates to dev first, then to production together with the app release.
+
 ## Data Model
 
 ```typescript

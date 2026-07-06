@@ -1,9 +1,9 @@
-import React, { useRef, useMemo, useState } from 'react';
+import React, { useRef, useMemo, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SectionList, TouchableOpacity, SafeAreaView,
 } from 'react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../../lib/AppContext';
@@ -17,6 +17,8 @@ import { spacing, radius } from '../../constants/theme';
 import StarsDisplay from '../../components/StarsDisplay';
 import FilterSheet from '../../components/FilterSheet';
 import GearButton from '../../components/GearButton';
+import FlowsBoard from '../../components/FlowsBoard';
+import { flowsSignal } from '../../lib/flowsSignal';
 
 interface CountrySection {
   title: string;
@@ -62,6 +64,18 @@ function makeStyles(c: Colors) {
       paddingBottom: spacing.sm,
     },
     title: { fontSize: 22, fontWeight: '800', color: c.textPrimary },
+    segmented: {
+      flexDirection: 'row',
+      backgroundColor: c.border,
+      borderRadius: radius.sm,
+      padding: 2,
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    segment: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
+    segmentActive: { backgroundColor: c.cardBg },
+    segmentText: { fontSize: 14, color: c.textTertiary, fontWeight: '600' },
+    segmentTextActive: { color: c.primary },
     filterBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -136,6 +150,18 @@ export default function RiversScreen() {
   const router = useRouter();
   const sheetRef = useRef<BottomSheet>(null);
   const [filter, setFilter] = useState<FilterType>({ kind: 'all' });
+  const [tab, setTab] = useState<'mine' | 'flows'>('mine');
+
+  // "Ver todos" del carrusel del home levanta esta señal para aterrizar
+  // directo en el segmento Caudales.
+  useFocusEffect(
+    useCallback(() => {
+      if (flowsSignal.openFlows) {
+        flowsSignal.openFlows = false;
+        setTab('flows');
+      }
+    }, []),
+  );
 
   const filtered = useMemo(() => applyFilter(days, filter), [days, filter]);
   const rivers = useMemo(() => aggregateRivers(filtered), [filtered]);
@@ -144,40 +170,56 @@ export default function RiversScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>{t('rivers.title')}</Text>
+        <Text style={styles.title}>{tab === 'mine' ? t('rivers.title') : t('flows.title')}</Text>
         <GearButton />
       </View>
 
-      <TouchableOpacity style={styles.filterBtn} onPress={() => sheetRef.current?.expand()}>
-        <Ionicons name="filter-outline" size={16} color={colors.primary} />
-        <Text style={styles.filterText}>{filterLabel(filter)}</Text>
-        <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
-      </TouchableOpacity>
+      <View style={styles.segmented}>
+        {(['mine', 'flows'] as const).map((s) => (
+          <TouchableOpacity key={s} style={[styles.segment, tab === s && styles.segmentActive]} onPress={() => setTab(s)}>
+            <Text style={[styles.segmentText, tab === s && styles.segmentTextActive]}>
+              {s === 'mine' ? t('flows.segMine') : t('flows.segFlows')}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-      {sections.length === 0 ? (
-        <View style={styles.empty}>
-          <Ionicons name="water-outline" size={48} color={colors.textTertiary} />
-          <Text style={styles.emptyText}>{t('rivers.empty')}</Text>
-        </View>
+      {tab === 'flows' ? (
+        <FlowsBoard />
       ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item, i) => `${item.name}-${item.country}-${i}`}
-          contentContainerStyle={styles.list}
-          stickySectionHeadersEnabled={false}
-          renderSectionHeader={({ section }) => <RiversSectionHeader section={section} styles={styles} />}
-          renderItem={({ item }) => (
-            <RiverRow
-              river={item}
-              styles={styles}
-              colors={colors}
-              onPress={() => router.push({ pathname: '/river', params: { name: item.name, country: item.country } } as any)}
+        <>
+          <TouchableOpacity style={styles.filterBtn} onPress={() => sheetRef.current?.expand()}>
+            <Ionicons name="filter-outline" size={16} color={colors.primary} />
+            <Text style={styles.filterText}>{filterLabel(filter)}</Text>
+            <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
+          </TouchableOpacity>
+
+          {sections.length === 0 ? (
+            <View style={styles.empty}>
+              <Ionicons name="water-outline" size={48} color={colors.textTertiary} />
+              <Text style={styles.emptyText}>{t('rivers.empty')}</Text>
+            </View>
+          ) : (
+            <SectionList
+              sections={sections}
+              keyExtractor={(item, i) => `${item.name}-${item.country}-${i}`}
+              contentContainerStyle={styles.list}
+              stickySectionHeadersEnabled={false}
+              renderSectionHeader={({ section }) => <RiversSectionHeader section={section} styles={styles} />}
+              renderItem={({ item }) => (
+                <RiverRow
+                  river={item}
+                  styles={styles}
+                  colors={colors}
+                  onPress={() => router.push({ pathname: '/river', params: { name: item.name, country: item.country } } as any)}
+                />
+              )}
             />
           )}
-        />
-      )}
 
-      <FilterSheet days={days} filter={filter} onSelect={setFilter} sheetRef={sheetRef} />
+          <FilterSheet days={days} filter={filter} onSelect={setFilter} sheetRef={sheetRef} />
+        </>
+      )}
     </SafeAreaView>
   );
 }
