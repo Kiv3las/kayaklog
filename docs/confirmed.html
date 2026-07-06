@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KayakLog — Cuenta confirmada</title>
+  <meta name="description" content="Tu cuenta de KayakLog fue confirmada.">
+  <meta name="robots" content="noindex">
+  <style>
+    :root {
+      --primary: #0a5dd1;
+      --primary-light: #3eb1ff;
+      --text: #1c1c1e;
+      --text-secondary: #4a4a4a;
+      --text-muted: #8e8e93;
+      --border: #e5e5ea;
+      --bg: #f7f8fa;
+      --card-bg: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text: #f5f5f7;
+        --text-secondary: #d1d1d6;
+        --text-muted: #98989d;
+        --border: #2c2c2e;
+        --bg: #000000;
+        --card-bg: #1c1c1e;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .logo {
+      width: 96px;
+      height: 96px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, var(--primary-light), var(--primary));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(10, 93, 209, 0.25);
+      font-size: 44px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      margin: 0 0 8px;
+      letter-spacing: -0.5px;
+    }
+    p {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin: 8px 0 24px;
+    }
+    .btn {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      text-decoration: none;
+      padding: 14px 32px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(10, 93, 209, 0.25);
+    }
+    .hint {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">✅</div>
+    <h1>¡Cuenta confirmada!</h1>
+    <p id="msg">Tu email fue verificado con éxito. Ya puedes iniciar sesión en KayakLog.</p>
+    <a class="btn" id="openApp" href="kayaklog://">Abrir KayakLog</a>
+    <p class="hint" id="hint">Si estás en tu computador, abre la app KayakLog en tu teléfono e inicia sesión.</p>
+  </div>
+  <script>
+    // El link del correo puede traer ?error=... si el token expiró o ya fue
+    // usado — en ese caso mostramos el mensaje correcto en vez de festejar.
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      var errDesc = params.get('error_description') || hash.get('error_description');
+      if (errDesc) {
+        document.querySelector('h1').textContent = 'El enlace ya no es válido';
+        document.querySelector('.logo').textContent = '⚠️';
+        document.getElementById('msg').textContent =
+          'Este enlace expiró o ya fue usado. Si tu cuenta ya está confirmada, simplemente inicia sesión en la app.';
+      }
+      // En móvil, intentar abrir la app directamente.
+      var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile && !errDesc) {
+        setTimeout(function () { window.location.href = 'kayaklog://'; }, 600);
+      }
+    })();
+  </script>
+</body>
+</html>
