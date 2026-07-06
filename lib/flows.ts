@@ -1,5 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { WaterLevel } from './types';
+
+const FLOWS_CACHE_KEY = 'kayak_flows_cache_v1';
 
 // Caudales de ríos chilenos. Las estaciones son un catálogo curado (tabla
 // flow_stations, solo lectura desde la app) y las lecturas llegan por un
@@ -80,10 +83,25 @@ function toStation(r: StationRow): FlowStation {
   };
 }
 
-// Estaciones activas + última lectura + lectura de hace ~24 h, en dos
-// consultas (las lecturas de las últimas 26 h son ~500 filas; reducir en JS
-// es más simple que un lateral join vía PostgREST).
+// Estaciones activas + última lectura + lectura de hace ~24 h. Si la red
+// falla, devuelve el último resultado cacheado en el dispositivo: para un
+// kayakista camino al río, "hace 3 horas iba en 80 m³/s" vale más que un
+// error (la antigüedad se ve en el "hace X" de cada tarjeta).
 export async function fetchStationsWithLatest(): Promise<StationCurrent[]> {
+  try {
+    const result = await fetchStationsWithLatestRemote();
+    void AsyncStorage.setItem(FLOWS_CACHE_KEY, JSON.stringify(result)).catch(() => {});
+    return result;
+  } catch (err) {
+    try {
+      const raw = await AsyncStorage.getItem(FLOWS_CACHE_KEY);
+      if (raw) return JSON.parse(raw) as StationCurrent[];
+    } catch { /* caché corrupta o ausente */ }
+    throw err;
+  }
+}
+
+async function fetchStationsWithLatestRemote(): Promise<StationCurrent[]> {
   const { data: stations, error: stErr } = await supabase
     .from('flow_stations')
     .select('code, name, river_name, region, lat, lng, thr_medio, thr_alto, thr_crecida')
