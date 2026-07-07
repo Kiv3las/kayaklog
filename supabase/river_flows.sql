@@ -76,6 +76,44 @@ insert into public.flow_stations
   ('11711000-1', 'Río Pascua ante Junta Río Quetru',      'Pascua',             'Aysén',         -48.15917, -73.08833, 600, null, null, null, 195),
   ('11701001-5', 'Río Mayer en Desembocadura',            'Mayer',              'Aysén',         -48.414722, -72.54639, 150, null, null, null, 197);
 
+-- ── RPC del tablero: todo en una llamada compacta ────────────────────────────
+-- La app llama flow_board() en vez de dos consultas en serie: estaciones
+-- activas + serie de 26 h por estación como [epoch, caudal]. ~15 KB total.
+-- (Aplicada en PROD el 2026-07-07.)
+
+create or replace function public.flow_board()
+returns jsonb
+language sql
+stable
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'code', s.code,
+    'name', s.name,
+    'river_name', s.river_name,
+    'region', s.region,
+    'lat', s.lat,
+    'lng', s.lng,
+    'thr_medio', s.thr_medio,
+    'thr_alto', s.thr_alto,
+    'thr_crecida', s.thr_crecida,
+    'is_sample', coalesce(r.any_sample, false),
+    'series', coalesce(r.series, '[]'::jsonb)
+  ) order by s.sort_order), '[]'::jsonb)
+  from public.flow_stations s
+  left join lateral (
+    select
+      jsonb_agg(jsonb_build_array(extract(epoch from x.ts)::bigint, x.flow) order by x.ts) as series,
+      bool_or(x.is_sample) as any_sample
+    from (
+      select ts, flow, is_sample
+      from public.flow_readings
+      where station_code = s.code
+        and ts >= now() - interval '26 hours'
+    ) x
+  ) r on true
+  where s.active
+$$;
+
 -- ── Colector real: edge function collect-flows + cron horario ────────────────
 -- La función supabase/functions/collect-flows/index.ts recolecta el caudal
 -- actual desde HIDROlínea DGA (servicio público oficial, sin login/captcha)

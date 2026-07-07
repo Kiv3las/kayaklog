@@ -9,7 +9,7 @@ import { useTheme } from '../lib/themeContext';
 import type { Colors } from '../constants/theme';
 import { spacing, radius } from '../constants/theme';
 import { WATER_LEVEL_COLOR, WATER_LEVEL_I18N } from '../lib/water';
-import { StationCurrent, fetchStationsWithLatest, classifyFlow, flowTrend } from '../lib/flows';
+import { StationCurrent, fetchStationsWithLatest, loadCachedStations, classifyFlow, flowTrend } from '../lib/flows';
 import { flowsSignal } from '../lib/flowsSignal';
 import { timeAgoLabel } from './FlowsBoard';
 import PressableScale from './PressableScale';
@@ -109,6 +109,14 @@ export default function FlowsCarousel({ refreshToken = 0, onLoaded }: {
   }, [onLoaded]);
 
   useEffect(() => { load(); }, [load, refreshToken]);
+
+  // Stale-while-revalidate: pintar al tiro el último tablero conocido
+  // mientras llega el fresco (la antigüedad se ve en el "hace X").
+  useEffect(() => {
+    loadCachedStations().then((cached) => {
+      if (cached) setItems((prev) => prev ?? cached);
+    });
+  }, []);
 
   const openBoard = () => {
     flowsSignal.openFlows = true;

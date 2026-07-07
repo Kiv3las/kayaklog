@@ -89,16 +89,65 @@ function toStation(r: StationRow): FlowStation {
 // error (la antigüedad se ve en el "hace X" de cada tarjeta).
 export async function fetchStationsWithLatest(): Promise<StationCurrent[]> {
   try {
-    const result = await fetchStationsWithLatestRemote();
+    // Camino rápido: la RPC flow_board trae todo en UNA llamada compacta.
+    // Si no existe en este entorno, caer al camino de dos consultas.
+    const result = await fetchBoardRpc().catch(() => fetchStationsWithLatestRemote());
     void AsyncStorage.setItem(FLOWS_CACHE_KEY, JSON.stringify(result)).catch(() => {});
     return result;
   } catch (err) {
-    try {
-      const raw = await AsyncStorage.getItem(FLOWS_CACHE_KEY);
-      if (raw) return JSON.parse(raw) as StationCurrent[];
-    } catch { /* caché corrupta o ausente */ }
+    const cached = await loadCachedStations();
+    if (cached) return cached;
     throw err;
   }
+}
+
+// Último tablero conocido, para render inmediato (stale-while-revalidate).
+export async function loadCachedStations(): Promise<StationCurrent[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(FLOWS_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as StationCurrent[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+interface BoardRow extends StationRow {
+  is_sample: boolean;
+  series: [number, number][]; // [epoch segundos, caudal]
+}
+
+async function fetchBoardRpc(): Promise<StationCurrent[]> {
+  const { data, error } = await supabase.rpc('flow_board');
+  if (error) throw error;
+  const rows = (data ?? []) as BoardRow[];
+  return rows.map((row) => {
+    const series: FlowReading[] = row.series.map(([epoch, flow]) => ({
+      ts: new Date(epoch * 1000).toISOString(),
+      flow: Number(flow),
+      isSample: row.is_sample,
+    }));
+    return buildCurrent(toStation(row), series);
+  });
+}
+
+// Deriva última lectura y lectura de ~24 h atrás desde la serie de 26 h.
+function buildCurrent(station: FlowStation, series: FlowReading[]): StationCurrent {
+  const latest = series.length > 0 ? series[series.length - 1] : null;
+  let dayAgo: FlowReading | null = null;
+  if (latest) {
+    const target = new Date(latest.ts).getTime() - 24 * 3600_000;
+    let best = Infinity;
+    for (const r of series) {
+      const d = Math.abs(new Date(r.ts).getTime() - target);
+      if (d < best) { best = d; dayAgo = r; }
+    }
+    // Si la lectura más cercana a "hace 24 h" está a menos de 20 h de la
+    // última, la serie es demasiado corta para hablar de tendencia diaria.
+    if (dayAgo && new Date(latest.ts).getTime() - new Date(dayAgo.ts).getTime() < 20 * 3600_000) {
+      dayAgo = null;
+    }
+  }
+  return { station, latest, dayAgo, series };
 }
 
 async function fetchStationsWithLatestRemote(): Promise<StationCurrent[]> {
@@ -124,25 +173,7 @@ async function fetchStationsWithLatestRemote(): Promise<StationCurrent[]> {
     byStation.set(r.station_code, list);
   }
 
-  return (stations ?? []).map((row) => {
-    const series = byStation.get(row.code) ?? [];
-    const latest = series.length > 0 ? series[series.length - 1] : null;
-    let dayAgo: FlowReading | null = null;
-    if (latest) {
-      const target = new Date(latest.ts).getTime() - 24 * 3600_000;
-      let best = Infinity;
-      for (const r of series) {
-        const d = Math.abs(new Date(r.ts).getTime() - target);
-        if (d < best) { best = d; dayAgo = r; }
-      }
-      // Si la lectura más cercana a "hace 24 h" está a menos de 20 h de la
-      // última, la serie es demasiado corta para hablar de tendencia diaria.
-      if (dayAgo && new Date(latest.ts).getTime() - new Date(dayAgo.ts).getTime() < 20 * 3600_000) {
-        dayAgo = null;
-      }
-    }
-    return { station: toStation(row), latest, dayAgo, series };
-  });
+  return (stations ?? []).map((row) => buildCurrent(toStation(row), byStation.get(row.code) ?? []));
 }
 
 export async function fetchStation(code: string): Promise<FlowStation | null> {

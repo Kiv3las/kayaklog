@@ -11,7 +11,7 @@ import type { Colors } from '../constants/theme';
 import { spacing, radius } from '../constants/theme';
 import { WATER_LEVEL_COLOR, WATER_LEVEL_I18N } from '../lib/water';
 import {
-  StationCurrent, fetchStationsWithLatest, classifyFlow, flowTrend, FlowTrend,
+  StationCurrent, fetchStationsWithLatest, loadCachedStations, classifyFlow, flowTrend, FlowTrend,
 } from '../lib/flows';
 import PressableScale from './PressableScale';
 
@@ -93,6 +93,14 @@ export default function FlowsBoard() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Stale-while-revalidate: pintar al tiro el último tablero conocido
+  // mientras llega el fresco.
+  useEffect(() => {
+    loadCachedStations().then((cached) => {
+      if (cached) setItems((prev) => prev ?? cached);
+    });
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
