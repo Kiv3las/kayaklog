@@ -2,7 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { WaterLevel } from './types';
 
-const FLOWS_CACHE_KEY = 'kayak_flows_cache_v1';
+// La clave incluye el proyecto Supabase: si el mismo build cambia de entorno
+// (dev ↔ prod vía .env), la caché de uno no debe aparecer en el otro.
+const PROJECT_REF = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '')
+  .replace(/^https?:\/\//, '')
+  .split('.')[0];
+const FLOWS_CACHE_KEY = `kayak_flows_cache_v1_${PROJECT_REF}`;
 
 // Caudales de ríos chilenos. Las estaciones son un catálogo curado (tabla
 // flow_stations, solo lectura desde la app) y las lecturas llegan por un
@@ -92,7 +97,11 @@ export async function fetchStationsWithLatest(): Promise<StationCurrent[]> {
     // Camino rápido: la RPC flow_board trae todo en UNA llamada compacta.
     // Si no existe en este entorno, caer al camino de dos consultas.
     const result = await fetchBoardRpc().catch(() => fetchStationsWithLatestRemote());
-    void AsyncStorage.setItem(FLOWS_CACHE_KEY, JSON.stringify(result)).catch(() => {});
+    // Solo cachear tableros con contenido: un [] cacheado suplantaría el
+    // estado de error/reintento con un "sin estaciones" permanente.
+    if (result.length > 0) {
+      void AsyncStorage.setItem(FLOWS_CACHE_KEY, JSON.stringify(result)).catch(() => {});
+    }
     return result;
   } catch (err) {
     const cached = await loadCachedStations();
@@ -102,10 +111,13 @@ export async function fetchStationsWithLatest(): Promise<StationCurrent[]> {
 }
 
 // Último tablero conocido, para render inmediato (stale-while-revalidate).
+// Vacío o corrupto cuenta como "sin caché".
 export async function loadCachedStations(): Promise<StationCurrent[] | null> {
   try {
     const raw = await AsyncStorage.getItem(FLOWS_CACHE_KEY);
-    return raw ? (JSON.parse(raw) as StationCurrent[]) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StationCurrent[];
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
   } catch {
     return null;
   }

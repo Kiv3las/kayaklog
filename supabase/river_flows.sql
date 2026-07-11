@@ -96,14 +96,15 @@ as $$
     'thr_medio', s.thr_medio,
     'thr_alto', s.thr_alto,
     'thr_crecida', s.thr_crecida,
-    'is_sample', coalesce(r.any_sample, false),
+    'is_sample', coalesce(r.latest_is_sample, false),
     'series', coalesce(r.series, '[]'::jsonb)
   ) order by s.sort_order), '[]'::jsonb)
   from public.flow_stations s
   left join lateral (
     select
       jsonb_agg(jsonb_build_array(extract(epoch from x.ts)::bigint, x.flow) order by x.ts) as series,
-      bool_or(x.is_sample) as any_sample
+      -- flag de la ÚLTIMA lectura (lo que ve el usuario), no de la ventana
+      (array_agg(x.is_sample order by x.ts desc))[1] as latest_is_sample
     from (
       select ts, flow, is_sample
       from public.flow_readings

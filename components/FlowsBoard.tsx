@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, SectionList, TouchableOpacity, RefreshControl, ActivityIndicator,
 } from 'react-native';
@@ -82,13 +82,19 @@ export default function FlowsBoard() {
   const [items, setItems] = useState<StationCurrent[] | null>(null);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Guardia de generación: un load antiguo no debe pisar el resultado de uno
+  // más nuevo (p. ej. pull-to-refresh mientras el de montaje sigue en vuelo).
+  const loadGen = useRef(0);
 
   const load = useCallback(async () => {
+    const gen = ++loadGen.current;
     try {
+      const result = await fetchStationsWithLatest();
+      if (gen !== loadGen.current) return;
       setError(false);
-      setItems(await fetchStationsWithLatest());
+      setItems(result);
     } catch {
-      setError(true);
+      if (gen === loadGen.current) setError(true);
     }
   }, []);
 

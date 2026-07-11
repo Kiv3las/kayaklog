@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
@@ -96,15 +96,22 @@ export default function FlowsCarousel({ refreshToken = 0, onLoaded }: {
   const router = useRouter();
   const [items, setItems] = useState<StationCurrent[] | null>(null);
   const [failed, setFailed] = useState(false);
+  // Guardia de generación: si un load antiguo resuelve después de uno nuevo
+  // (pull-to-refresh mientras el de montaje sigue en vuelo), el viejo no debe
+  // pisar los datos frescos ni apagar el spinner del refresh ajeno.
+  const loadGen = useRef(0);
 
   const load = useCallback(async () => {
+    const gen = ++loadGen.current;
     try {
-      setItems(await fetchStationsWithLatest());
+      const result = await fetchStationsWithLatest();
+      if (gen !== loadGen.current) return;
+      setItems(result);
       setFailed(false);
     } catch {
-      setFailed(true);
+      if (gen === loadGen.current) setFailed(true);
     } finally {
-      onLoaded?.();
+      if (gen === loadGen.current) onLoaded?.();
     }
   }, [onLoaded]);
 
