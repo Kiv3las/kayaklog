@@ -20,6 +20,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const BASE = 'https://snia.mop.gob.cl/sat/site/informes/mapas/mapas.xhtml';
 const AJAX_SOURCE = 'medicionesByTypeFunctions:j_idt162';
 
+// Desde 2026-07-29 HIDROlínea responde 403 al User-Agent por defecto de Deno
+// ("Deno/x.y.z"), que fue lo que detuvo la recolección. Nos identificamos con
+// el nombre de la app + URL + contacto: es la práctica cortés para un cliente
+// automatizado y permite a la DGA ubicarnos si nuestro tráfico les molesta
+// (son ~20 peticiones/hora sobre un servicio público sin login ni captcha).
+const USER_AGENT = 'KayakLog/1.1 (+https://kiv3las.github.io/kayaklog/; kilian@ivelic.cl)';
+
 function extractViewState(html: string): string | null {
   return html.match(/name="javax\.faces\.ViewState"[^>]*value="([^"]+)"/)?.[1]
     ?? html.match(/ViewState[^>]*><!\[CDATA\[([^\]]+)\]\]/)?.[1]
@@ -51,7 +58,12 @@ async function fetchStationFlow(cookie: string, viewState: string, code: string)
   });
   const res = await fetch(BASE, {
     method: 'POST',
-    headers: { 'Cookie': cookie, 'Faces-Request': 'partial/ajax', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+    headers: {
+      'Cookie': cookie,
+      'Faces-Request': 'partial/ajax',
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'User-Agent': USER_AGENT,
+    },
     body,
   });
   const xml = await res.text();
@@ -71,15 +83,27 @@ Deno.serve(async (_req) => {
 
   try {
     // 1. Sesión + ViewState
-    const page = await fetch(BASE);
+    const page = await fetch(BASE, { headers: { 'User-Agent': USER_AGENT } });
+    const html = await page.text();
     const cookie = extractCookies(page);
-    let viewState = extractViewState(await page.text());
-    if (!viewState) throw new Error('No se encontró ViewState inicial');
+    let viewState = extractViewState(html);
+    if (!viewState) {
+      // Distinguir "nos bloquearon" de "cambió el HTML": son fallas con
+      // arreglos distintos y el mensaje genérico costó días de diagnóstico.
+      throw new Error(
+        `No se encontró ViewState inicial (HTTP ${page.status}, ${html.length} bytes). ` +
+        (page.ok ? 'La página respondió pero cambió su estructura.' : 'La DGA rechazó la petición.'),
+      );
+    }
 
     // 2. Búsqueda de fluviométricas con parámetro Caudal (fija el estado de la vista)
     const search = await fetch(BASE, {
       method: 'POST',
-      headers: { 'Cookie': cookie, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      headers: {
+        'Cookie': cookie,
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'User-Agent': USER_AGENT,
+      },
       body: new URLSearchParams({
         'searchForm': 'searchForm',
         'searchForm:regionInput': '',
