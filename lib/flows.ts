@@ -88,6 +88,25 @@ function toStation(r: StationRow): FlowStation {
   };
 }
 
+const FLOWS_TIMEOUT_MS = 12_000;
+
+// Rechaza si la promesa no resuelve en `ms`. No cancela la consulta de fondo
+// (no hace falta: su resultado se descarta), solo garantiza que la UI avance.
+// Acepta PromiseLike porque los builders de PostgREST son "thenables", no
+// promesas: se pueden esperar con await pero no tienen .catch/.finally.
+function withTimeout<T>(promise: PromiseLike<T>, ms = FLOWS_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`Caudales: sin respuesta en ${ms} ms`)),
+      ms,
+    );
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 // Estaciones activas + última lectura + lectura de hace ~24 h. Si la red
 // falla, devuelve el último resultado cacheado en el dispositivo: para un
 // kayakista camino al río, "hace 3 horas iba en 80 m³/s" vale más que un
@@ -96,12 +115,23 @@ export async function fetchStationsWithLatest(): Promise<StationCurrent[]> {
   try {
     // Camino rápido: la RPC flow_board trae todo en UNA llamada compacta.
     // Si no existe en este entorno, caer al camino de dos consultas.
-    const result = await fetchBoardRpc().catch(() => fetchStationsWithLatestRemote());
-    // Solo cachear tableros con contenido: un [] cacheado suplantaría el
-    // estado de error/reintento con un "sin estaciones" permanente.
-    if (result.length > 0) {
-      void AsyncStorage.setItem(FLOWS_CACHE_KEY, JSON.stringify(result)).catch(() => {});
+    // El timeout es la red de seguridad del tablero: si la consulta se cuelga
+    // (cliente supabase trabado, respuesta que no llega), preferimos mostrar
+    // la caché o el error con reintento antes que un spinner infinito.
+    const result = await withTimeout(
+      fetchBoardRpc().catch(() => fetchStationsWithLatestRemote()),
+    );
+    // Un catálogo vacío NUNCA es un resultado legítimo: flow_stations tiene 20
+    // estaciones fijas. Si llega [], la consulta salió sin sesión válida y RLS
+    // filtró todo — PostgREST responde 200, no error, así que sin este chequeo
+    // el tablero mostraría "sin estaciones" en silencio, sin reintento. Visto
+    // en producción el 2026-08-27: al arrancar, dos cargas en paralelo y la que
+    // gana puede salir antes de que la sesión esté lista (en `days` eso mismo
+    // devolvió 401). Tratarlo como falla deja actuar a la caché y al reintento.
+    if (result.length === 0) {
+      throw new Error('Caudales: respuesta vacía (sesión no lista o sin permisos)');
     }
+    void AsyncStorage.setItem(FLOWS_CACHE_KEY, JSON.stringify(result)).catch(() => {});
     return result;
   } catch (err) {
     const cached = await loadCachedStations();
@@ -189,11 +219,11 @@ async function fetchStationsWithLatestRemote(): Promise<StationCurrent[]> {
 }
 
 export async function fetchStation(code: string): Promise<FlowStation | null> {
-  const { data, error } = await supabase
+  const { data, error } = await withTimeout(supabase
     .from('flow_stations')
     .select('code, name, river_name, region, lat, lng, thr_medio, thr_alto, thr_crecida')
     .eq('code', code)
-    .maybeSingle();
+    .maybeSingle());
   if (error || !data) return null;
   return toStation(data);
 }
@@ -220,12 +250,12 @@ export function matchStationForRiver(items: StationCurrent[], riverName: string)
 
 export async function fetchStationHistory(code: string, days = 7): Promise<FlowReading[]> {
   const since = new Date(Date.now() - days * 86400_000).toISOString();
-  const { data, error } = await supabase
+  const { data, error } = await withTimeout(supabase
     .from('flow_readings')
     .select('ts, flow, is_sample')
     .eq('station_code', code)
     .gte('ts', since)
-    .order('ts', { ascending: true });
+    .order('ts', { ascending: true }));
   if (error) throw error;
   return (data ?? []).map((r) => ({ ts: r.ts, flow: Number(r.flow), isSample: r.is_sample }));
 }

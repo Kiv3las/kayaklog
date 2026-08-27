@@ -175,7 +175,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // INITIAL_SESSION, PASSWORD_RECOVERY). supabase-js v2 fires
     // INITIAL_SESSION on subscribe with the cached session, so this also
     // handles app bootstrap.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // IMPORTANTE: este callback es SÍNCRONO a propósito y no espera (await)
+    // ninguna llamada a supabase. supabase-js lo invoca desde dentro de su
+    // candado de sesión (`_notifyAllSubscribers`, p. ej. en TOKEN_REFRESHED),
+    // y su documentación advierte que hacer `await` de otra llamada de la
+    // librería aquí puede provocar un deadlock: la consulta necesita
+    // getSession(), que espera el mismo candado que este callback bloquea.
+    // Todo lo que toque supabase o el almacenamiento se aplaza con
+    // setTimeout(0), que ya corre fuera del candado. (Con supabase-js 2.106
+    // el caso concreto de abajo no llegaba a trabarse — probado con la
+    // librería real —, pero depender de ese detalle interno no vale la pena.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       // During password recovery the user is on /auth/reset to update their
       // password and then re-login. Skip the full data load — it serves no
@@ -189,31 +199,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (currentUser) {
         sessionUserSeen = true;
         setUser(currentUser);
-        void saveLastUser({ id: currentUser.id, name: currentUser.user_metadata?.name });
-        await loadUserData(currentUser.id);
-        if (event === 'INITIAL_SESSION') {
-          // Validate the cached JWT against the server in the background.
-          // Only sign out on definitive auth rejection (401/403). Network
-          // errors are ignored so the user stays signed in offline.
-          supabase.auth.getUser().then(({ error }) => {
-            if (!mounted) return;
-            if (error?.status === 401 || error?.status === 403) {
-              supabase.auth.signOut();
-            }
-          });
-        }
+        setTimeout(() => {
+          if (!mounted) return;
+          void saveLastUser({ id: currentUser.id, name: currentUser.user_metadata?.name });
+          void loadUserData(currentUser.id);
+          if (event === 'INITIAL_SESSION') {
+            // Validate the cached JWT against the server in the background.
+            // Only sign out on definitive auth rejection (401/403). Network
+            // errors are ignored so the user stays signed in offline.
+            supabase.auth.getUser().then(({ error }) => {
+              if (!mounted) return;
+              if (error?.status === 401 || error?.status === 403) {
+                supabase.auth.signOut();
+              }
+            });
+          }
+        }, 0);
       } else {
         // Sesión nula: solo desloguear si es un cierre de sesión real. Una
         // INITIAL_SESSION nula con usuario conocido en el dispositivo es el
         // caso "offline con token vencido" — mantener el arranque offline.
-        const last = event === 'SIGNED_OUT' ? null : await loadLastUser();
-        if (!last) {
-          sessionUserSeen = false;
-          setUser(null);
-          setDays([]);
-          setSettings({ notifEnabled: false, notifTime: '21:00' });
-          setIsLoading(false);
-        }
+        setTimeout(async () => {
+          if (!mounted) return;
+          const last = event === 'SIGNED_OUT' ? null : await loadLastUser();
+          if (!mounted) return;
+          if (!last) {
+            sessionUserSeen = false;
+            setUser(null);
+            setDays([]);
+            setSettings({ notifEnabled: false, notifTime: '21:00' });
+            setIsLoading(false);
+          }
+        }, 0);
       }
     });
 
