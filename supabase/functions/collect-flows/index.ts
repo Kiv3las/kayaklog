@@ -13,7 +13,7 @@
 // de ejemplo de la misma hora.
 //
 // Cortesía con el servidor DGA: peticiones por estación en serie con una
-// pausa corta — ~19 requests/hora en total.
+// pausa corta — ~26 requests/hora en total.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -26,6 +26,18 @@ const AJAX_SOURCE = 'medicionesByTypeFunctions:j_idt162';
 // automatizado y permite a la DGA ubicarnos si nuestro tráfico les molesta
 // (son ~20 peticiones/hora sobre un servicio público sin login ni captcha).
 const USER_AGENT = 'KayakLog/1.1 (+https://kiv3las.github.io/kayaklog/; kilian@ivelic.cl)';
+
+// Las edge functions mueren a los 150 s de tiempo de pared. Con las
+// estaciones en serie una corrida tarda 70–130 s según cómo responda la DGA,
+// y a veces más: el upsert iba al final, así que una corrida que tocaba el
+// límite perdía la hora completa (10 horas perdidas entre el 6 y el 20 de
+// octubre de 2026). Pasado este plazo no se empiezan estaciones nuevas.
+const DEADLINE_MS = 130_000;
+// Ninguna petición puede colgar la corrida: sin plazo propio, una respuesta
+// trabada de la DGA se comería el margen hasta el límite de 150 s. Una
+// estación tarda ~3 s; la página inicial (2 MB) y la búsqueda, 15–20 s.
+const STATION_TIMEOUT_MS = 15_000;
+const PAGE_TIMEOUT_MS = 45_000;
 
 function extractViewState(html: string): string | null {
   return html.match(/name="javax\.faces\.ViewState"[^>]*value="([^"]+)"/)?.[1]
@@ -65,9 +77,14 @@ async function fetchStationFlow(cookie: string, viewState: string, code: string)
       'User-Agent': USER_AGENT,
     },
     body,
+    signal: AbortSignal.timeout(STATION_TIMEOUT_MS),
   });
   const xml = await res.text();
-  const raw = xml.match(/ultimoCaudalReg = "([^"]*)"/)?.[1];
+  // Sin el marcador la respuesta está rota (no es "estación sin dato", que
+  // trae el marcador vacío): lanzar para que el llamador reintente.
+  const match = xml.match(/ultimoCaudalReg = "([^"]*)"/);
+  if (!match) throw new Error(`Respuesta sin ultimoCaudalReg (HTTP ${res.status}, ${xml.length} bytes)`);
+  const raw = match[1];
   if (!raw) return null;
   // Formato chileno: coma decimal, punto de miles ("1.234,56")
   const num = Number(raw.replace(/\./g, '').replace(',', '.'));
@@ -75,6 +92,7 @@ async function fetchStationFlow(cookie: string, viewState: string, code: string)
 }
 
 Deno.serve(async (_req) => {
+  const startedAt = Date.now();
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -83,7 +101,7 @@ Deno.serve(async (_req) => {
 
   try {
     // 1. Sesión + ViewState
-    const page = await fetch(BASE, { headers: { 'User-Agent': USER_AGENT } });
+    const page = await fetch(BASE, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(PAGE_TIMEOUT_MS) });
     const html = await page.text();
     const cookie = extractCookies(page);
     let viewState = extractViewState(html);
@@ -96,7 +114,9 @@ Deno.serve(async (_req) => {
       );
     }
 
-    // 2. Búsqueda de fluviométricas con parámetro Caudal (fija el estado de la vista)
+    // 2. Búsqueda de fluviométricas con parámetro Caudal (fija el estado de la
+    // vista). Cuesta ~15 s, pero es necesaria: probado 2026-10-20, sin ella
+    // el popup devuelve vacío en 1 de cada 4 estaciones.
     const search = await fetch(BASE, {
       method: 'POST',
       headers: {
@@ -114,48 +134,79 @@ Deno.serve(async (_req) => {
         'searchForm:buttonSearch': 'Buscar',
         'javax.faces.ViewState': viewState,
       }),
+      signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
     });
     viewState = extractViewState(await search.text()) ?? viewState;
 
     // 3. Caudal por estación
     const { data: stations, error: stErr } = await supabase
-      .from('flow_stations').select('code').eq('active', true);
+      .from('flow_stations').select('code').eq('active', true).order('sort_order');
     if (stErr) throw stErr;
 
     const ts = new Date();
     ts.setMinutes(0, 0, 0); // lectura asignada a la hora en curso
 
-    const results: Record<string, number | null> = {};
-    for (const { code } of stations ?? []) {
-      try {
-        results[code] = await fetchStationFlow(cookie, viewState, code);
-      } catch {
-        results[code] = null;
+    // Orden rotado por hora: si una corrida lenta llega al plazo, las
+    // estaciones que quedan fuera cambian de hora en hora en vez de ser
+    // siempre las del final del catálogo (Patagonia).
+    const list = stations ?? [];
+    const offset = ts.getUTCHours() % Math.max(list.length, 1);
+    const ordered = [...list.slice(offset), ...list.slice(0, offset)];
+
+    let collected = 0;
+    let writeErrors = 0;
+    const missing: string[] = [];
+    const skipped: string[] = [];
+    for (const { code } of ordered) {
+      if (Date.now() - startedAt > DEADLINE_MS) { skipped.push(code); continue; }
+
+      // HIDROlínea falla de forma intermitente: corta la conexión HTTP/2
+      // (GOAWAY) tras ~24 peticiones, a veces devuelve una respuesta rota y a
+      // veces un valor vacío que un minuto después sí trae el dato (Mayer,
+      // 2026-10-20). Rotas: hasta 3 intentos. Vacías: un reintento, que
+      // distingue el vacío pasajero de la estación que de verdad no transmite
+      // (Bravo) sin gastarle más tiempo.
+      let flow: number | null = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        if (attempt > 1 && Date.now() - startedAt > DEADLINE_MS) break;
+        try {
+          flow = await fetchStationFlow(cookie, viewState, code);
+          if (flow !== null || attempt >= 2) break;
+        } catch (err) {
+          if (attempt === 3) { console.warn(`[collect-flows] ${code}: ${err}`); break; }
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+
+      if (flow === null) {
+        missing.push(code);
+      } else {
+        // Guardar al tiro, no al final: si la función muere por el límite de
+        // tiempo, lo ya leído queda. Upsert: si la hora ya tenía dato (p. ej.
+        // del generador de ejemplo), el real lo sobrescribe.
+        const { error: upErr } = await supabase
+          .from('flow_readings')
+          .upsert({ station_code: code, ts: ts.toISOString(), flow, is_sample: false }, { onConflict: 'station_code,ts' });
+        if (upErr) {
+          console.warn(`[collect-flows] ${code}: upsert ${upErr.message}`);
+          writeErrors++;
+          missing.push(code);
+        } else {
+          collected++;
+        }
       }
       await new Promise((r) => setTimeout(r, 400));
     }
 
-    const rows = Object.entries(results)
-      .filter(([, flow]) => flow !== null)
-      .map(([code, flow]) => ({
-        station_code: code,
-        ts: ts.toISOString(),
-        flow,
-        is_sample: false,
-      }));
-
-    if (rows.length > 0) {
-      // upsert con update: si el generador de ejemplo ya escribió esta hora,
-      // el dato real lo sobrescribe.
-      const { error: upErr } = await supabase
-        .from('flow_readings')
-        .upsert(rows, { onConflict: 'station_code,ts' });
-      if (upErr) throw upErr;
-    }
-
-    const failed = Object.entries(results).filter(([, f]) => f === null).map(([c]) => c);
-    console.log(`[collect-flows] ok=${rows.length} sin_dato=${failed.length}`, failed.length ? failed : '');
-    return new Response(JSON.stringify({ collected: rows.length, missing: failed }), {
+    const secs = Math.round((Date.now() - startedAt) / 1000);
+    console.log(
+      `[collect-flows] ok=${collected} sin_dato=${missing.length} sin_tiempo=${skipped.length} ${secs}s`,
+      missing.length || skipped.length ? { missing, skipped } : '',
+    );
+    // Un error de escritura es falla nuestra, no "la DGA no tenía dato":
+    // responder 500 para que no se confunda con una corrida sana.
+    return new Response(JSON.stringify({ collected, missing, skipped, writeErrors, seconds: secs }), {
+      status: writeErrors > 0 ? 500 : 200,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {

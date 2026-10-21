@@ -3,7 +3,7 @@
 -- (p. ej. kayaklog-dev) desde cero:
 --   1. Este archivo (tablas base)
 --   2. supabase/river_flows.sql (caudales; reemplazar <PROJECT_REF>/<ANON_KEY>)
---   3. supabase functions deploy delete-account && supabase functions deploy collect-flows
+--   3. supabase functions deploy delete-account && supabase functions deploy collect-flows && supabase functions deploy collect-forecasts
 --   4. supabase config push --project-ref <ref> (auth: site_url + redirects)
 
 create extension if not exists "uuid-ossp";
