@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
-import { WaterLevel } from './types';
+import { Day, WaterLevel } from './types';
+import { isoFromDate } from './dates';
 
 // La clave incluye el proyecto Supabase: si el mismo build cambia de entorno
 // (dev ↔ prod vía .env), la caché de uno no debe aparecer en el otro.
@@ -62,6 +63,12 @@ export function flowTrend(latest: number, dayAgo: number): FlowTrend {
   return 'flat';
 }
 
+// Cambio en 24 h como porcentaje entero (+12, -8), o null sin referencia.
+export function flowChangePct(latest: number, dayAgo: number): number | null {
+  if (dayAgo <= 0) return null;
+  return Math.round(((latest - dayAgo) / dayAgo) * 100);
+}
+
 interface StationRow {
   code: string;
   name: string;
@@ -121,8 +128,8 @@ export async function fetchStationsWithLatest(): Promise<StationCurrent[]> {
     const result = await withTimeout(
       fetchBoardRpc().catch(() => fetchStationsWithLatestRemote()),
     );
-    // Un catálogo vacío NUNCA es un resultado legítimo: flow_stations tiene 20
-    // estaciones fijas. Si llega [], la consulta salió sin sesión válida y RLS
+    // Un catálogo vacío NUNCA es un resultado legítimo: flow_stations es un
+    // catálogo fijo (24 estaciones). Si llega [], la consulta salió sin sesión válida y RLS
     // filtró todo — PostgREST responde 200, no error, así que sin este chequeo
     // el tablero mostraría "sin estaciones" en silencio, sin reintento. Visto
     // en producción el 2026-08-27: al arrancar, dos cargas en paralelo y la que
@@ -230,22 +237,178 @@ export async function fetchStation(code: string): Promise<FlowStation | null> {
 
 // Empareja un río del registro personal con una estación de caudales por
 // nombre: sin tildes ni mayúsculas, ignorando el paréntesis aclaratorio de la
-// estación ("Trancura (Puesco)" → base "trancura"). Prefiere el match exacto.
-function normalizeRiverName(s: string): string {
+// estación ("Trancura (Puesco)" → base "trancura"). Prefiere el match exacto;
+// el apodo entre paréntesis también cuenta como exacto ("Dirty Toilet",
+// "Ojos del Caburgua").
+export function normalizeRiverName(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 }
 
 export function matchStationForRiver(items: StationCurrent[], riverName: string): StationCurrent | null {
   const target = normalizeRiverName(riverName);
   if (!target) return null;
+  let nicknamed: StationCurrent | null = null;
   let partial: StationCurrent | null = null;
   for (const item of items) {
     const full = normalizeRiverName(item.station.riverName);
     const base = normalizeRiverName(item.station.riverName.replace(/\s*\(.*\)\s*$/, ''));
+    const nickname = normalizeRiverName(item.station.riverName.match(/\(([^)]*)\)\s*$/)?.[1] ?? '');
     if (full === target) return item;
+    if (!nicknamed && nickname === target) nicknamed = item;
     if (!partial && (base === target || base.startsWith(target) || target.startsWith(base))) partial = item;
   }
-  return partial;
+  return nicknamed ?? partial;
+}
+
+// ── Detalle de estación ─────────────────────────────────────────────────────
+
+export interface FlowDaily {
+  day: string;  // YYYY-MM-DD, fecha de Chile
+  avg: number;
+  min: number;
+  max: number;
+}
+
+export interface FlowForecastDay {
+  day: string;               // YYYY-MM-DD, fecha de Chile
+  flow: number | null;       // estimado; null si el río no tiene pronóstico de caudal
+  precipMm: number | null;
+  tempMax: number | null;
+}
+
+export interface StationDetail {
+  station: FlowStation;
+  hourly: FlowReading[];          // últimos 7 días, ascendente
+  daily: FlowDaily[];             // todo el historial, un punto por día
+  forecast: FlowForecastDay[];    // de hoy en adelante
+  forecastIssuedAt: string | null;
+  hasFlowForecast: boolean;
+}
+
+const DETAIL_CACHE_PREFIX = `kayak_flow_detail_v1_${PROJECT_REF}_`;
+
+interface DetailRow extends StationRow {
+  has_flow_forecast: boolean;
+  hourly: [number, number][];
+  daily: [string, number, number, number][];
+  forecast: [string, number | null, number | null, number | null][];
+  forecast_issued_at: string | null;
+}
+
+const numOrNull = (v: number | string | null) => (v === null ? null : Number(v));
+
+async function fetchDetailRpc(code: string): Promise<StationDetail> {
+  const { data, error } = await supabase.rpc('flow_station_detail', { p_code: code });
+  if (error) throw error;
+  // Los códigos vienen del catálogo, así que null casi siempre es sesión no
+  // lista (RLS filtra todo, ver fetchStationsWithLatest): tratarlo como falla
+  // para que actúen la caché y el reintento.
+  if (!data) throw new Error('Caudales: detalle vacío (sesión no lista o sin permisos)');
+  const row = data as DetailRow;
+  return {
+    station: toStation(row),
+    hourly: row.hourly.map(([epoch, flow]) => ({
+      ts: new Date(epoch * 1000).toISOString(), flow: Number(flow), isSample: false,
+    })),
+    daily: row.daily.map(([day, avg, min, max]) => ({
+      day, avg: Number(avg), min: Number(min), max: Number(max),
+    })),
+    forecast: row.forecast.map(([day, flow, precip, tmax]) => ({
+      day, flow: numOrNull(flow), precipMm: numOrNull(precip), tempMax: numOrNull(tmax),
+    })),
+    forecastIssuedAt: row.forecast_issued_at,
+    hasFlowForecast: row.has_flow_forecast,
+  };
+}
+
+// Entornos sin la RPC (migración aún no aplicada): el detalle de antes, solo
+// con 7 días horarios. Los promedios diarios se derivan de esa serie.
+async function fetchDetailFallback(code: string): Promise<StationDetail> {
+  const [station, hourly] = await Promise.all([fetchStation(code), fetchStationHistory(code, 7)]);
+  if (!station) throw new Error('Caudales: estación no encontrada');
+  const byDay = new Map<string, number[]>();
+  for (const r of hourly) {
+    const day = isoFromDate(new Date(r.ts));
+    byDay.set(day, [...(byDay.get(day) ?? []), r.flow]);
+  }
+  const daily = Array.from(byDay.entries()).map(([day, flows]) => ({
+    day,
+    avg: flows.reduce((a, b) => a + b, 0) / flows.length,
+    min: Math.min(...flows),
+    max: Math.max(...flows),
+  }));
+  return { station, hourly, daily, forecast: [], forecastIssuedAt: null, hasFlowForecast: false };
+}
+
+// Detalle completo de una estación, con la misma red de seguridad que el
+// tablero: timeout y, si la red falla, el último detalle visto en el
+// dispositivo (útil camino al río, sin señal).
+export async function fetchStationDetail(code: string): Promise<StationDetail> {
+  try {
+    const detail = await withTimeout(fetchDetailRpc(code).catch(() => fetchDetailFallback(code)));
+    void AsyncStorage.setItem(DETAIL_CACHE_PREFIX + code, JSON.stringify(detail)).catch(() => {});
+    return detail;
+  } catch (err) {
+    const cached = await loadCachedDetail(code);
+    if (cached) return cached;
+    throw err;
+  }
+}
+
+export async function loadCachedDetail(code: string): Promise<StationDetail | null> {
+  try {
+    const raw = await AsyncStorage.getItem(DETAIL_CACHE_PREFIX + code);
+    return raw ? (JSON.parse(raw) as StationDetail) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Caudal DGA de un día del registro: promedio de las lecturas de esa fecha
+// local; null si no hay (antes de que existiera el colector, o la estación
+// no transmitió).
+export async function fetchDayFlow(code: string, dateISO: string): Promise<number | null> {
+  const [y, m, d] = dateISO.split('-').map(Number);
+  const { data, error } = await withTimeout(supabase
+    .from('flow_readings')
+    .select('flow')
+    .eq('station_code', code)
+    .gte('ts', new Date(y, m - 1, d).toISOString())
+    .lt('ts', new Date(y, m - 1, d + 1).toISOString()));
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+  return data.reduce((acc, r) => acc + Number(r.flow), 0) / data.length;
+}
+
+// ── Tus bajadas ─────────────────────────────────────────────────────────────
+
+export interface Paddle {
+  date: string;          // Day.date
+  section?: string;
+  stars: number;
+  flow?: number;         // caudal anotado en el lap, si lo hay
+}
+
+// Laps del registro personal cuyo río corresponde a esta estación. Usa el
+// mismo emparejamiento que la tarjeta "Caudal ahora" del río (solo Chile:
+// las estaciones son de la DGA), contra el catálogo completo para respetar
+// la preferencia por el match exacto.
+export function paddlesForStation(days: Day[], items: StationCurrent[], code: string): Paddle[] {
+  const matchCache = new Map<string, string | null>();
+  const out: Paddle[] = [];
+  for (const day of days) {
+    for (const river of day.rivers) {
+      if (river.country !== 'CL') continue;
+      if (!matchCache.has(river.name)) {
+        matchCache.set(river.name, matchStationForRiver(items, river.name)?.station.code ?? null);
+      }
+      if (matchCache.get(river.name) !== code) continue;
+      for (const lap of river.laps) {
+        out.push({ date: day.date, section: lap.section || undefined, stars: lap.stars, flow: lap.flow });
+      }
+    }
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function fetchStationHistory(code: string, days = 7): Promise<FlowReading[]> {

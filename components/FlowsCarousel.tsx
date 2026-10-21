@@ -11,6 +11,7 @@ import { spacing, radius } from '../constants/theme';
 import { WATER_LEVEL_COLOR, WATER_LEVEL_I18N } from '../lib/water';
 import { StationCurrent, fetchStationsWithLatest, loadCachedStations, classifyFlow, flowTrend } from '../lib/flows';
 import { flowsSignal } from '../lib/flowsSignal';
+import { useFlowFavorites } from '../lib/flowFavorites';
 import { timeAgoLabel } from './FlowsBoard';
 import PressableScale from './PressableScale';
 
@@ -81,6 +82,12 @@ function makeStyles(c: Colors) {
     trendIcon: { marginLeft: 2 },
     updated: { fontSize: 10, color: c.textTertiary, marginTop: 6 },
     loadingBox: { height: 120, alignItems: 'center', justifyContent: 'center' },
+    emptyCard: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      backgroundColor: c.cardBg, borderRadius: radius.md, borderWidth: 1, borderColor: c.border,
+      paddingVertical: 14, paddingHorizontal: 14,
+    },
+    emptyText: { flex: 1, fontSize: 13, color: c.textSecondary },
     section: { marginBottom: spacing.md },
   });
 }
@@ -94,6 +101,7 @@ export default function FlowsCarousel({ refreshToken = 0, onLoaded }: {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
+  const { favorites, loaded: favoritesLoaded } = useFlowFavorites();
   const [items, setItems] = useState<StationCurrent[] | null>(null);
   const [failed, setFailed] = useState(false);
   // Guardia de generación: si un load antiguo resuelve después de uno nuevo
@@ -130,10 +138,16 @@ export default function FlowsCarousel({ refreshToken = 0, onLoaded }: {
     router.navigate('/(tabs)/rivers');
   };
 
+  // Solo los ríos marcados con ♥, en orden de catálogo (norte→sur). Un
+  // favorito sin lectura se muestra igual ("Sin datos"): que no desaparezca
+  // en silencio.
+  const favoriteItems = useMemo(() => {
+    const fav = new Set(favorites);
+    return (items ?? []).filter((i) => fav.has(i.station.code));
+  }, [items, favorites]);
+
   // Sin datos no hay sección: el home no muestra un bloque de error.
   if (failed && items === null) return null;
-
-  const withData = (items ?? []).filter((i) => i.latest);
 
   return (
     <View style={styles.section}>
@@ -145,8 +159,14 @@ export default function FlowsCarousel({ refreshToken = 0, onLoaded }: {
         </TouchableOpacity>
       </View>
 
-      {items === null ? (
+      {items === null || !favoritesLoaded ? (
         <View style={styles.loadingBox}><ActivityIndicator color={colors.primary} /></View>
+      ) : favoriteItems.length === 0 ? (
+        <PressableScale style={styles.emptyCard} onPress={openBoard}>
+          <Ionicons name="heart-outline" size={22} color={colors.danger} />
+          <Text style={styles.emptyText}>{t('flows.homeEmpty')}</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        </PressableScale>
       ) : (
         <ScrollView
           horizontal
@@ -156,7 +176,7 @@ export default function FlowsCarousel({ refreshToken = 0, onLoaded }: {
           snapToInterval={CARD_WIDTH + 10}
           decelerationRate="fast"
         >
-          {withData.map((item, i) => (
+          {favoriteItems.map((item, i) => (
             <Animated.View key={item.station.code} entering={FadeInDown.duration(350).delay(Math.min(i, 6) * 60)}>
               <FlowCard
                 item={item}
@@ -181,7 +201,16 @@ function FlowCard({ item, styles, colors, t, onPress }: {
   onPress: () => void;
 }) {
   const { station, latest, dayAgo, series } = item;
-  if (!latest) return null;
+  if (!latest) {
+    return (
+      <PressableScale style={styles.card} onPress={onPress}>
+        <View style={[styles.accent, { backgroundColor: colors.textTertiary }]} />
+        <Text style={styles.river} numberOfLines={1}>{station.riverName}</Text>
+        <Text style={[styles.flowValue, { color: colors.textTertiary }]}>–</Text>
+        <Text style={styles.updated}>{t('flows.noData')}</Text>
+      </PressableScale>
+    );
+  }
   const level = classifyFlow(station, latest.flow);
   // Sin umbrales calibrados no se clasifica: acento y sparkline en el color
   // primario, sin chip de nivel.

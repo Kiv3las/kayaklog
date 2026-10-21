@@ -24,6 +24,8 @@ import StarRating from '../../components/StarRating';
 import RiverAutocomplete from '../../components/RiverAutocomplete';
 import CountryPicker from '../../components/CountryPicker';
 import MapPicker from '../../components/MapPicker';
+import DgaFlowHint from '../../components/DgaFlowHint';
+import { StationCurrent, fetchStationsWithLatest, loadCachedStations } from '../../lib/flows';
 
 const DIFFICULTIES: Difficulty[] = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 const DIFFICULTY_COLOR: Record<Difficulty, string> = {
@@ -424,6 +426,27 @@ export default function AddScreen() {
     }, [editId, router]),
   );
 
+  // Catálogo de caudales para sugerir el dato DGA de cada lap. La pantalla
+  // queda montada entre visitas: se refresca al entrar, pero no más de una
+  // vez cada 10 min (las lecturas son horarias).
+  const [flowCatalog, setFlowCatalog] = useState<StationCurrent[] | null>(null);
+  const flowCatalogFetchedAt = useRef(0);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      loadCachedStations().then((cached) => { if (active && cached) setFlowCatalog((prev) => prev ?? cached); });
+      if (Date.now() - flowCatalogFetchedAt.current > 10 * 60_000) {
+        fetchStationsWithLatest()
+          .then((items) => {
+            flowCatalogFetchedAt.current = Date.now();
+            if (active) setFlowCatalog(items);
+          })
+          .catch(() => {});
+      }
+      return () => { active = false; };
+    }, []),
+  );
+
   const today = new Date();
 
   function updateRiver(ri: number, partial: Partial<River>) {
@@ -712,6 +735,14 @@ export default function AddScreen() {
                   placeholder={t('add.flowOptional')}
                   placeholderTextColor={colors.textTertiary}
                   keyboardType="decimal-pad"
+                />
+                <DgaFlowHint
+                  catalog={flowCatalog}
+                  riverName={river.name}
+                  country={river.country}
+                  dateISO={isoFromDate(date)}
+                  currentFlow={lap.flow}
+                  onUse={(flow, level) => updateLap(ri, li, { flow, ...(level && !lap.waterLevel ? { waterLevel: level } : {}) })}
                 />
 
                 <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{t('add.location')}</Text>
