@@ -155,6 +155,11 @@ insert into public.flow_stations
   ('09417002-8', 'Ojos del Caburgua',           'Desagüe (Ojos del Caburgua)',  'Araucanía',     -39.24389, -71.84417, 80, null, null, null, 146),
   ('11614001-2', 'Río Bravo',                   'Bravo',                        'Aysén',         -48.032776, -73.0225, 100, null, null, null, 192);
 
+-- Agregada por Kilian 2026-10-21 (4,6 m³/s en vivo al agregarla).
+insert into public.flow_stations
+  (code, name, river_name, region, lat, lng, base_flow, thr_medio, thr_alto, thr_crecida, sort_order) values
+  ('05702001-6', 'Río Volcán en Queltehues',    'Volcán',                       'Metropolitana', -33.809444, -70.21028, 8, null, null, null, 17);
+
 -- ── Celda GloFAS por estación (pronóstico de caudal) ────────────────────────
 -- GloFAS (Copernicus, vía Open-Meteo Flood API) modela el caudal en una grilla
 -- de 0,05°. La celda más cercana a la estación muchas veces cae en un afluente

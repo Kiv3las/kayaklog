@@ -129,7 +129,7 @@ export async function fetchStationsWithLatest(): Promise<StationCurrent[]> {
       fetchBoardRpc().catch(() => fetchStationsWithLatestRemote()),
     );
     // Un catálogo vacío NUNCA es un resultado legítimo: flow_stations es un
-    // catálogo fijo (24 estaciones). Si llega [], la consulta salió sin sesión válida y RLS
+    // catálogo fijo (25 estaciones). Si llega [], la consulta salió sin sesión válida y RLS
     // filtró todo — PostgREST responde 200, no error, así que sin este chequeo
     // el tablero mostraría "sin estaciones" en silencio, sin reintento. Visto
     // en producción el 2026-08-27: al arrancar, dos cargas en paralelo y la que
