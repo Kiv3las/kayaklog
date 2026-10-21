@@ -7,6 +7,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import Constants from 'expo-constants';
 import { useApp } from '../lib/AppContext';
 import { useTheme } from '../lib/themeContext';
 import type { AppearanceMode } from '../lib/themeContext';
@@ -417,7 +418,7 @@ export default function SettingsScreen() {
           <Text style={styles.hint}>{t('settings.deleteAccountHint')}</Text>
         </View>
 
-        <Text style={styles.version}>KayakLog · v1.0.0</Text>
+        <Text style={styles.version}>KayakLog · v{Constants.expoConfig?.version ?? ''}</Text>
       </ScrollView>
     </SafeAreaView>
   );
